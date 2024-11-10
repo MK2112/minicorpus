@@ -173,3 +173,7 @@ if __name__ == "__main__":
 # tmux new -s 160m_minipile
 # conda activate minipile
 # torchrun --nproc_per_node=1 02_train_160M.py
+# Detach from tmux session: Ctrl-b followed by d
+# Reattach to tmux session: tmux attach -t 160m_minipile
+# tmux list-sessions
+# tmux kill-session -t <session_name>
