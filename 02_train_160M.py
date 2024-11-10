@@ -1,103 +1,175 @@
-# Related to 02_eval_160M.ipynb
+# Adapted from 02_eval_160M.ipynb
 # Training script for Distributed Training of Pythia 160M on MiniPile
 
+import gc
 import os
 import torch
+import numpy as np
+
 from pathlib import Path
 from datasets import load_dataset
-from transformers import AutoModelForCausalLM, AutoTokenizer, Trainer, TrainingArguments
+from transformers import (AutoModelForCausalLM, AutoTokenizer, Trainer, TrainingArguments, DataCollatorForLanguageModeling)
 
-##
-##
-# torchrun --nproc_per_node=<<NUM GPUs>> 02_train_160M.py
-##
-##
+seed = 42
+
+# This script expects datasets and models to be stored offline already
+# See 02_eval_160M.ipynb for details on how to download and prepare the datasets and models
 
 def training():
+    local_rank = int(os.environ.get("LOCAL_RANK", 0)) # GPU ID
+    world_size = int(os.environ.get("WORLD_SIZE", 1)) # Number of GPUs
+    
     base_dir = "/mnt/data"
     base_path = Path(base_dir)
 
-    # Loading minipile from the local directory 
-    # https://stackoverflow.com/questions/77020278/how-to-load-a-huggingface-dataset-from-local-path
-    # https://github.com/MK2112/mobileYOLOv3/blob/main/mobileyolov3-cocotext.ipynb
-    # Split is named exactly like with the original dataset https://huggingface.co/datasets/JeanKaddour/minipile
-    print('Loading MiniPile train + val datasets...')
-    minipile_train = load_dataset("parquet",
-                                data_files={
-                                    "train": str(base_path / "MiniPile" / "data" / "train-*.parquet"),
-                                    "validation": str(base_path / "MiniPile" / "data" / "validation-*.parquet"),
-                                    "test": str(base_path / "MiniPile" / "data" / "test-*.parquet")
-                                },
-                                cache_dir=str(base_path / "MiniPile_Cache"),
-                                split="train")
+    torch.manual_seed(seed)
+    np.random.seed(seed)
+    if torch.cuda.is_available():
+        torch.cuda.manual_seed_all(seed)
+        torch.cuda.set_device(local_rank)
 
-    minipile_val = load_dataset("parquet",
-                                data_files={
-                                    "train": str(base_path / "MiniPile" / "data" / "train-*.parquet"),
-                                    "validation": str(base_path / "MiniPile" / "data" / "validation-*.parquet"),
-                                    "test": str(base_path / "MiniPile" / "data" / "test-*.parquet")
-                                },
-                                cache_dir=str(base_path / "MiniPile_Cache"),
-                                split="validation")
+    if local_rank == 0:
+        print('Loading MiniPile train + val datasets...')
+    
+    # Load original tokenizer
+    tokenizer = AutoTokenizer.from_pretrained(base_path / "pythia160m_dedup_untrained",
+                                              use_fast=True,
+                                              local_files_only=True,
+                                              model_max_length=2048) # maximum len for inputs to the model
 
-    # Load the untrained Pythia 160M tokenizer and model
-    # https://stackoverflow.com/questions/64001128/load-a-pre-trained-model-from-disk-with-huggingface-transformers
-    tokenizer = AutoTokenizer.from_pretrained(base_path / "pythia160m_dedup_untrained", use_fast=True, local_files_only=True)
-    empty_model = AutoModelForCausalLM.from_pretrained(base_path / "pythia160m_dedup_untrained", local_files_only=True)
+    if tokenizer.pad_token is None:
+        tokenizer.pad_token = tokenizer.eos_token
+        tokenizer.pad_token_id = tokenizer.eos_token_id
 
-    def tokenize(example): # seq_len = max_length = 2048 (always)
-        return tokenizer(example["text"], truncation=True, padding="max_length", max_length=2048)
+    if torch.cuda.is_available():
+        torch.cuda.empty_cache()
+        gc.collect()
 
-    minipile_train_tokenized = minipile_train.map(tokenize, batched=True)
-    minipile_train_tokenized.set_format(type="torch", columns=["input_ids", "attention_mask"]) # new fields from tokenizing
+    if not os.path.exists(base_path / "minipile_train_tokenized"):
+        minipile_train = load_dataset("parquet",
+                                      data_files={
+                                          "train": str(base_path / "MiniPile" / "data" / "train-*.parquet"),
+                                      },
+                                      split="train")
 
-    # Not really needed, but we have it, might as well make it serve as a reference for investigation of the model's performance
-    minipile_val_tokenized = minipile_val.map(tokenize, batched=True)
-    minipile_train_tokenized.set_format(type="torch", columns=["input_ids", "attention_mask"]) # new fields from tokenizing
+        minipile_val = load_dataset("parquet",
+                                    data_files={
+                                        "validation": str(base_path / "MiniPile" / "data" / "validation-*.parquet"),
+                                    },
+                                    split="validation")
 
-    if torch.cuda.is_available() and torch.cuda.device_count() > 1:
-        torch.distributed.init_process_group("nccl")
+        def tokenize(example):
+            return tokenizer(example["text"],
+                             truncation=True,
+                             max_length=2048,
+                             padding=False,
+                             return_special_tokens_mask=True)
+
+        # Tokenize datasets
+        minipile_train_tokenized = minipile_train.map(tokenize, batched=True, remove_columns=minipile_train.column_names, num_proc=1)
+        minipile_val_tokenized = minipile_val.map(tokenize, batched=True, remove_columns=minipile_val.column_names, num_proc=1)
+
+        # Save tokenized datasets
+        if local_rank == 0:
+            minipile_train_tokenized.save_to_disk(base_path / "minipile_train_tokenized")
+            minipile_val_tokenized.save_to_disk(base_path / "minipile_val_tokenized")
+
+    minipile_train_tokenized = load_dataset("arrow", 
+                                            data_files=str(base_path / "minipile_train_tokenized/*.arrow"),
+                                            streaming=True,
+                                            split="train").with_format("torch")
+    minipile_val_tokenized = load_dataset("arrow", 
+                                          data_files=str(base_path / "minipile_val_tokenized/*.arrow"),
+                                          streaming=True,
+                                          split="train").with_format("torch")
+
+    if torch.cuda.is_available():
+        torch.cuda.empty_cache()
+        gc.collect()
+
+    # Load model
+    device = torch.device(f'cuda:{local_rank}' if torch.cuda.is_available() else 'cpu')
+    model = AutoModelForCausalLM.from_pretrained(base_path / "pythia160m_dedup_untrained", local_files_only=True, low_cpu_mem_usage=True)
+    model = model.to(device)
+
+    # Data collator for dynamic padding
+    data_collator = DataCollatorForLanguageModeling(tokenizer=tokenizer, mlm=False, pad_to_multiple_of=8)
+
+    # Calculate Batch Distribution Details
+    effective_batch_size = 1024
+    per_gpu_batch_size = 2
+    gradient_accumulation_steps = effective_batch_size // (per_gpu_batch_size * world_size)
 
     output_dir = str(base_path / "pythia160m_minipile_trained")
     log_dir = str(base_path / "160m_minipile_logs")
     os.makedirs(output_dir, exist_ok=True)
     os.makedirs(log_dir, exist_ok=True)
 
-
-    # https://huggingface.co/docs/transformers/v4.46.0/en/main_classes/trainer#transformers.TrainingArguments
     training_args = TrainingArguments(
         output_dir=output_dir,
         overwrite_output_dir=True,
-        num_train_epochs=1.5,            # Since train_iters gets set, use num_train_epochs=1.5 like for The Pile
-        per_device_train_batch_size=8,   # Gives an effective batch size of 1024 after grad accum
-        per_device_eval_batch_size=8,    # Same as training batch size
-        gradient_accumulation_steps=128, # Achieve a batch size of 1024
-        learning_rate=6e-4,              # Default Pythia 160M
-        weight_decay=0.01,               # Default Pythia 160M
-        max_steps=1024,                  # Adjusted for MiniPile
-        lr_scheduler_type="cosine",      # As per Pythia 160M paper
-        warmup_steps=int(0.01 * 1024),   # 1% of total steps for warmup
+        num_train_epochs=1.5,  # Ideally this gets overriden by max_steps, but just in case
+        per_device_train_batch_size=per_gpu_batch_size,
+        per_device_eval_batch_size=per_gpu_batch_size,
+        gradient_accumulation_steps=gradient_accumulation_steps,
+        learning_rate=6e-4,
+        weight_decay=0.01,
+        max_steps=1024,
+        lr_scheduler_type="cosine",
+        warmup_steps=int(0.01 * 1024),
         logging_dir=log_dir,
         logging_steps=10,
-        evaluation_strategy="steps",
-        eval_steps=100,     # Frequency for evaluation during training
-        save_steps=1024,    # Save at the end of training
-        save_total_limit=1, # Only keep the most recent checkpoint
-        fp16=False,         # Not using mixed precision for comparable conditions
-        report_to="none",   # Noting this for later iterations, maybe set this as "wandb", "tensorboard" or smth
-        ddp_find_unused_parameters=False, # see https://discuss.pytorch.org/t/how-to-change-ddp-parameter-find-unused-parameters-true-to-false-during-training/130763
+        eval_strategy="steps",
+        eval_steps=100,
+        save_steps=1024,
+        save_total_limit=1,
+        fp16=False,
+        report_to="none",
+        ddp_find_unused_parameters=False,
+        local_rank=local_rank,
     )
 
-    # Train Pythia 160M Untrained on MiniPile
-    # https://huggingface.co/docs/transformers/v4.46.0/en/main_classes/trainer
-    trainer = Trainer(model=empty_model,
+    trainer = Trainer(model=model,
                       args=training_args,
                       train_dataset=minipile_train_tokenized,
-                      eval_dataset=minipile_val_tokenized)
+                      eval_dataset=minipile_val_tokenized,
+                      data_collator=data_collator)
+
+    if torch.cuda.is_available():
+        torch.cuda.empty_cache()
+        gc.collect()
 
     trainer.train()
-    trainer.save_model(str(base_path / "pythia160m_minipile_trained")) # This saves the model weights
-    tokenizer.save_pretrained(str(base_path / "pythia160m_minipile_trained")) # This saves the tokenizer (don't know if needed, better save than sorry)
+
+    # Save model only on main process
+    if local_rank == 0:
+        trainer.save_model(str(base_path / "pythia160m_minipile_trained"))
+        tokenizer.save_pretrained(str(base_path / "pythia160m_minipile_trained"))
+
+##
+# torchrun --nproc_per_node=<<NUM GPUs>> 02_train_160M.py
+##
 
 if __name__ == "__main__":
+    # Print GPU details
+    if torch.cuda.is_available():
+        device_count = torch.cuda.device_count()
+        print(f"Available GPUs: {device_count}")
+        for i in range(device_count):
+            device = torch.device(f'cuda:{i}')
+            device_properties = torch.cuda.get_device_properties(device)
+            total_mem = device_properties.total_memory / (1024 ** 3)
+            allocd_mem = torch.cuda.memory_allocated(device) / (1024 ** 3)
+            free_mem = total_mem - allocd_mem
+            print(f"\nGPU {i}:\t{device_properties.name}")
+            print(f"\tTotal memory:\t\t{total_mem:.2f} GiB")
+            print(f"\tAllocated memory:\t{allocd_mem:5.2f} GiB")
+            print(f"\tFree memory:\t\t{free_mem:.2f} GiB")
+    else:
+        print("No CUDA-capable GPUs available")
+    # Start training
     training()
+
+# tmux new -s 160m_minipile
+# conda activate minipile
+# torchrun --nproc_per_node=1 02_train_160M.py
