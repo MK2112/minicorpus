@@ -4,10 +4,13 @@
 import os
 import torch
 import numpy as np
+from tqdm import tqdm
 from pathlib import Path
+from torch.optim import Adam
 from datasets import load_dataset
 from huggingface_hub import snapshot_download
-from transformers import AutoModelForCausalLM, AutoTokenizer, DataCollatorForLanguageModeling, Trainer, TrainingArguments
+from transformers import DataCollatorForLanguageModeling
+from transformers import AutoModelForCausalLM, AutoTokenizer, Trainer, TrainingArguments, get_scheduler
 
 base_dir = "/mnt/data"
 base_path = Path(base_dir)
@@ -119,10 +122,10 @@ def training():
     training_args = TrainingArguments(
         output_dir=output_dir,
         overwrite_output_dir=True,
-        num_train_epochs=1.5,                     # Since train_iters gets set, use num_train_epochs=1.5 like for The Pile
-        per_device_train_batch_size=batch_size,   # Gives an effective batch size of 1024 after grad accum
-        per_device_eval_batch_size=batch_size,    # Same as training batch size
-        gradient_accumulation_steps=(total_batch // batch_size), # Achieve a batch size of 1024
+        num_train_epochs=1.5,            # Since train_iters gets set, use num_train_epochs=1.5 like for The Pile
+        per_device_train_batch_size=4,   # Gives an effective batch size of 1024 after grad accum
+        per_device_eval_batch_size=4,    # Same as training batch size
+        gradient_accumulation_steps=256, # Achieve a batch size of 1024
         learning_rate=6e-4,              # Default Pythia 160M
         weight_decay=0.01,               # Default Pythia 160M
         max_steps=1024,                  # Adjusted for MiniPile (https://discuss.huggingface.co/t/how-does-max-steps-affect-the-number-of-samples-the-model-sees/69681)
@@ -137,21 +140,44 @@ def training():
         fp16=False,         # Not using mixed precision for comparable conditions
         report_to=None,     # Noting this for later iterations, maybe set this as "wandb", "tensorboard" or smth
         ddp_find_unused_parameters=False, # see https://discuss.pytorch.org/t/how-to-change-ddp-parameter-find-unused-parameters-true-to-false-during-training/130763
+        max_grad_norm=1.0,  # As per Pythia 160M paper
     )
 
     # Ensure training across multiple GPUs if available
     device = "cuda" if torch.cuda.is_available() else "cpu"
     empty_model = empty_model.to(device)
 
+    optimizer = Adam(empty_model.parameters(), lr=training_args.learning_rate, betas=(0.9, 0.95), eps=1e-8, weight_decay=0.01)
+
     # Train Pythia 160M Untrained on MiniPile
     # https://huggingface.co/docs/transformers/v4.46.0/en/main_classes/trainer
     trainer = Trainer(model=empty_model,
-                      args=training_args,
-                      train_dataset=minipile_train_tokenized,
-                      eval_dataset=minipile_val_tokenized,
-                      data_collator=data_collator)
+                    args=training_args,
+                    train_dataset=minipile_train_tokenized,
+                    eval_dataset=minipile_val_tokenized,
+                    data_collator=data_collator,
+                    optimizers=(optimizer, None))
 
-    trainer.train()
+    scheduler = get_scheduler(name=training_args.lr_scheduler_type,
+                            optimizer=optimizer,
+                            num_warmup_steps=training_args.warmup_steps,
+                            num_training_steps=training_args.max_steps)
+
+    num_batches = len(trainer.get_train_dataloader())  # Number of batches
+    total_training_steps = num_batches * training_args.gradient_accumulation_steps * int(training_args.num_train_epochs)
+
+    # Training loop with manual minimum learning rate enforcement
+    for epoch in range(int(training_args.num_train_epochs)):
+        with tqdm(total=total_training_steps, desc=f"Training Epoch {epoch + 1}/{int(training_args.num_train_epochs)}") as pbar:
+            for _, batch in enumerate(trainer.get_train_dataloader()):
+                trainer.training_step(trainer.model, batch)
+                optimizer.step()
+                scheduler.step()
+                optimizer.zero_grad()
+                for param_group in optimizer.param_groups:
+                    # Manually ... ensure lr doesn't go below min_lr (Pythia wants this)
+                    param_group['lr'] = max(param_group['lr'], 6e-5)
+                pbar.update(1)
 
     # Why is this a two-step process?!
     trainer.save_model(str(base_path / "pythia160m_minipile_trained")) # This saves the model weights
