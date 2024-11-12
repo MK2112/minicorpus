@@ -9,11 +9,32 @@ from pathlib import Path
 from torch.optim import Adam
 from datasets import load_dataset
 from huggingface_hub import snapshot_download
+from torch.optim.lr_scheduler import _LRScheduler
 from transformers import DataCollatorForLanguageModeling
-from transformers import AutoModelForCausalLM, AutoTokenizer, Trainer, TrainingArguments, get_scheduler
+from transformers import AutoModelForCausalLM, AutoTokenizer, Trainer, TrainingArguments, get_cosine_schedule_with_warmup
 
 base_dir = "/mnt/data"
 base_path = Path(base_dir)
+
+class CosineSchedulerWithMinLR(_LRScheduler):
+    # Basically wrapping the get_cosing_schedule_with_warmup in a lower-bound setting
+    # Allows for Cosine Scheduling with a min_lr enforced
+    def __init__(self, optimizer, num_warmup_steps, num_training_steps, min_lr=6e-5):
+        self.min_lr = min_lr
+        self.base_scheduler = get_cosine_schedule_with_warmup(
+            optimizer=optimizer,
+            num_warmup_steps=num_warmup_steps,
+            num_training_steps=num_training_steps
+        )
+        super().__init__(optimizer)
+        
+    def get_lr(self):
+        lrs = self.base_scheduler.get_lr()
+        return [max(lr, self.min_lr) for lr in lrs]
+        
+    def step(self):
+        self.base_scheduler.step()
+        super().step() 
 
 def download_model(down_dir: str, target_folder: str, cache_folder: str, repo_id: str, branch: str = "main") -> None:
     down_dir = Path(down_dir)
@@ -86,7 +107,7 @@ def training():
         minipile_train_tokenized.save_to_disk(base_path / "minipile_train_tokenized")
         minipile_val_tokenized.save_to_disk(base_path / "minipile_val_tokenized")
 
-    batch_size = 2
+    batch_size = 16     # 32 is too much for 4xA6000
     total_batch = 1024
 
     # Dynamic padding during training (mlm -> mask language model -> we're doing causal here)
@@ -123,13 +144,12 @@ def training():
         output_dir=output_dir,
         overwrite_output_dir=True,
         num_train_epochs=1.5,            # Since train_iters gets set, use num_train_epochs=1.5 like for The Pile
-        per_device_train_batch_size=4,   # Gives an effective batch size of 1024 after grad accum
-        per_device_eval_batch_size=4,    # Same as training batch size
-        gradient_accumulation_steps=256, # Achieve a batch size of 1024
+        per_device_train_batch_size=batch_size,   # Gives an effective batch size of 1024 after grad accum
+        per_device_eval_batch_size=batch_size,    # Same as training batch size
+        gradient_accumulation_steps=(total_batch // batch_size), # Achieve a batch size of 1024
         learning_rate=6e-4,              # Default Pythia 160M
         weight_decay=0.01,               # Default Pythia 160M
         max_steps=1024,                  # Adjusted for MiniPile (https://discuss.huggingface.co/t/how-does-max-steps-affect-the-number-of-samples-the-model-sees/69681)
-        lr_scheduler_type="cosine",      # As per Pythia 160M paper
         warmup_steps=int(0.01 * 1024),   # 1% of total steps for warmup
         logging_dir=log_dir,
         logging_steps=10,
@@ -149,6 +169,13 @@ def training():
 
     optimizer = Adam(empty_model.parameters(), lr=training_args.learning_rate, betas=(0.9, 0.95), eps=1e-8, weight_decay=0.01)
 
+    scheduler = CosineSchedulerWithMinLR(
+        optimizer=optimizer,
+        num_warmup_steps=training_args.warmup_steps,
+        num_training_steps=training_args.max_steps,
+        min_lr=6e-5
+    )
+
     # Train Pythia 160M Untrained on MiniPile
     # https://huggingface.co/docs/transformers/v4.46.0/en/main_classes/trainer
     trainer = Trainer(model=empty_model,
@@ -156,28 +183,9 @@ def training():
                     train_dataset=minipile_train_tokenized,
                     eval_dataset=minipile_val_tokenized,
                     data_collator=data_collator,
-                    optimizers=(optimizer, None))
+                    optimizers=(optimizer, scheduler))
 
-    scheduler = get_scheduler(name=training_args.lr_scheduler_type,
-                            optimizer=optimizer,
-                            num_warmup_steps=training_args.warmup_steps,
-                            num_training_steps=training_args.max_steps)
-
-    num_batches = len(trainer.get_train_dataloader())  # Number of batches
-    total_training_steps = num_batches * training_args.gradient_accumulation_steps * int(training_args.num_train_epochs)
-
-    # Training loop with manual minimum learning rate enforcement
-    for epoch in range(int(training_args.num_train_epochs)):
-        with tqdm(total=total_training_steps, desc=f"Training Epoch {epoch + 1}/{int(training_args.num_train_epochs)}") as pbar:
-            for _, batch in enumerate(trainer.get_train_dataloader()):
-                trainer.training_step(trainer.model, batch)
-                optimizer.step()
-                scheduler.step()
-                optimizer.zero_grad()
-                for param_group in optimizer.param_groups:
-                    # Manually ... ensure lr doesn't go below min_lr (Pythia wants this)
-                    param_group['lr'] = max(param_group['lr'], 6e-5)
-                pbar.update(1)
+    trainer.train()
 
     # Why is this a two-step process?!
     trainer.save_model(str(base_path / "pythia160m_minipile_trained")) # This saves the model weights
@@ -188,8 +196,8 @@ if __name__ == "__main__":
 
 # tmux new -s 160m_minipile
 # conda activate minipile
-# torchrun --nproc_per_node=1 02_train_160M.py
+# torchrun --nproc_per_node=4 02_train_160M.py
 # Detach from tmux session: Ctrl-b followed by d
 # Reattach to tmux session: tmux attach -t 160m_minipile
 # tmux list-sessions
-# tmux kill-session -t <session_name>
+# tmux kill-session -t 160m_minipile
