@@ -107,11 +107,11 @@ def training():
         minipile_train_tokenized.save_to_disk(base_path / "minipile_train_tokenized")
         minipile_val_tokenized.save_to_disk(base_path / "minipile_val_tokenized")
 
-    batch_size = 16     # 32 is too much for 4xA6000
+    batch_size = 8     # 16 is too much for 4xA6000
     total_batch = 1024
 
     # Dynamic padding during training (mlm -> mask language model -> we're doing causal here)
-    data_collator = DataCollatorForLanguageModeling(tokenizer=tokenizer, mlm=False)
+    data_collator = DataCollatorForLanguageModeling(tokenizer=tokenizer, mlm=False, pad_to_multiple_of=8)
 
     seed = 42
     torch.manual_seed(seed)
@@ -161,6 +161,8 @@ def training():
         report_to=None,     # Noting this for later iterations, maybe set this as "wandb", "tensorboard" or smth
         ddp_find_unused_parameters=False, # see https://discuss.pytorch.org/t/how-to-change-ddp-parameter-find-unused-parameters-true-to-false-during-training/130763
         max_grad_norm=1.0,  # As per Pythia 160M paper
+        dataloader_num_workers=4,
+        dataloader_pin_memory=True,
     )
 
     # Ensure training across multiple GPUs if available
@@ -189,7 +191,6 @@ def training():
 
     # Why is this a two-step process?!
     trainer.save_model(str(base_path / "pythia160m_minipile_trained")) # This saves the model weights
-    tokenizer.save_pretrained(str(base_path / "pythia160m_minipile_trained")) # This saves the tokenizer (don't know if needed, better save than sorry)
 
 if __name__ == "__main__":
     training()
