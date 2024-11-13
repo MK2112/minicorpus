@@ -157,7 +157,7 @@ def training():
         eval_steps=100,     # Frequency for evaluation during training
         save_steps=1024,    # Save at the end of training
         save_total_limit=1, # Only keep the most recent checkpoint
-        fp16=False,         # Not using mixed precision for comparable conditions
+        fp16=True,          # Using FP16 for training precision
         report_to=None,     # Noting this for later iterations, maybe set this as "wandb", "tensorboard" or smth
         ddp_find_unused_parameters=False, # see https://discuss.pytorch.org/t/how-to-change-ddp-parameter-find-unused-parameters-true-to-false-during-training/130763
         max_grad_norm=1.0,  # As per Pythia 160M paper
