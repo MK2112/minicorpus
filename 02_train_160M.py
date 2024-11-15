@@ -202,3 +202,5 @@ if __name__ == "__main__":
 # Reattach to tmux session: tmux attach -t 160m_minipile
 # tmux list-sessions
 # tmux kill-session -t 160m_minipile
+
+# Training took 33,2 hours on gruenau8
