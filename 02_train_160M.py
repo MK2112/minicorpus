@@ -203,4 +203,4 @@ if __name__ == "__main__":
 # tmux list-sessions
 # tmux kill-session -t 160m_minipile
 
-# Training took 33,2 hours on gruenau8
+# Training took 33.2 hours on gruenau8
