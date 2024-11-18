@@ -96,6 +96,19 @@ def monitor_and_fit():
             time.sleep(600)
             continue # Skip the rest of the loop
 
+        # Check for new files being written
+        if shards:
+            # Get the most recent shard
+            last_shard = sorted(shards)[-1]
+            last_modified_time = last_shard.stat().st_mtime
+            
+            # Check if the file was modified recently (e.g., within the last 5 minutes)
+            # Back off to have potential writing processes conclude
+            if time.time() - last_modified_time < 400: 
+                print(f"Detected recent modification ({time.time() - last_modified_time}). Backing off for another 5 minutes...")
+                time.sleep(300)  # Wait for an additional 5 minutes
+                continue
+
         last_filename = sorted(shards)[-1]
 
         # Process each individual parquet file
