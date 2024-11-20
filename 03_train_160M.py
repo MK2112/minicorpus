@@ -1,5 +1,5 @@
-# Adapted from 02_eval_160M.ipynb
-# Training script for Distributed Training of Pythia 160M on MiniPile
+# Adapted from 02_eval_160M.ipynb and 02_train_160M.py
+# Training script for Distributed Training of Pythia 160M on *self-created* MiniPile
 
 import os
 import torch
@@ -65,23 +65,19 @@ def training():
                    cache_folder="pythia160m_dedup_untrained_Cache",
                    repo_id="EleutherAI/pythia-160m-deduped", branch="step0")
 
-    download_model(down_dir=base_dir, target_folder="pythia160m_dedup_pile", 
-                   cache_folder="pythia160m_dedup_pile_Cache",
-                   repo_id="EleutherAI/pythia-160m-deduped", branch="main")
-
-    minipile_train = load_dataset("parquet",
-                                  data_files={
-                                      "train": str(base_path / "MiniPile" / "data" / "train-*.parquet"),
-                                  },
-                                  cache_dir=str(base_path / "MiniPile_Cache"),
-                                  split="train")
-
-    minipile_val = load_dataset("parquet",
-                                data_files={
-                                    "validation": str(base_path / "MiniPile" / "data" / "validation-*.parquet"),
-                                },
-                                cache_dir=str(base_path / "MiniPile_Cache"),
-                                split="validation")
+    minipile_self_train = load_dataset("parquet",
+                                        data_files={
+                                            "train": str(base_path / "MiniPile_Self" / "data" / "train-*.parquet"),
+                                        },
+                                        cache_dir=str(base_path / "MiniPile_Self_Cache"),
+                                        split="train")
+    
+    minipile_self_val = load_dataset("parquet",
+                                        data_files={
+                                            "validation": str(base_path / "MiniPile_Self" / "data" / "validation-*.parquet"),
+                                        },
+                                        cache_dir=str(base_path / "MiniPile_Self_Cache"),
+                                        split="validation")
 
     tokenizer = AutoTokenizer.from_pretrained(base_path / "pythia160m_dedup_untrained", use_fast=True, local_files_only=True)
     empty_model = AutoModelForCausalLM.from_pretrained(base_path / "pythia160m_dedup_untrained", local_files_only=True, low_cpu_mem_usage=True)
@@ -98,14 +94,14 @@ def training():
                          max_length=2048,
                          return_special_tokens_mask=True)
 
-    if os.path.exists(base_path / "minipile_train_tokenized"):
-        minipile_train_tokenized = load_dataset("arrow", data_files=str(base_path / "minipile_train_tokenized/*.arrow"), split="train")
-        minipile_val_tokenized = load_dataset("arrow", data_files=str(base_path / "minipile_val_tokenized/*.arrow"), split="train")
+    if os.path.exists(base_path / "minipile_self_train_tokenized"):
+        minipile_self_train_tokenized = load_dataset("arrow", data_files=str(base_path / "minipile_self_train_tokenized/*.arrow"), split="train")
+        minipile_self_val_tokenized = load_dataset("arrow", data_files=str(base_path / "minipile_self_val_tokenized/*.arrow"), split="train")
     else:
-        minipile_train_tokenized = minipile_train.map(tokenize, batched=True, remove_columns=minipile_train.column_names) # retain only new fields from tokenization
-        minipile_val_tokenized = minipile_val.map(tokenize, batched=True, remove_columns=minipile_val.column_names)
-        minipile_train_tokenized.save_to_disk(base_path / "minipile_train_tokenized")
-        minipile_val_tokenized.save_to_disk(base_path / "minipile_val_tokenized")
+        minipile_self_train_tokenized = minipile_self_train.map(tokenize, batched=True, remove_columns=minipile_self_train.column_names) # retain only new fields from tokenization
+        minipile_self_val_tokenized = minipile_self_val.map(tokenize, batched=True, remove_columns=minipile_self_val.column_names)
+        minipile_self_train_tokenized.save_to_disk(base_path / "minipile_self_train_tokenized")
+        minipile_self_val_tokenized.save_to_disk(base_path / "minipile_self_val_tokenized")
 
     batch_size = 8     # 16 is too much for 4xA6000
     total_batch = 1024
@@ -134,8 +130,8 @@ def training():
     else:
         print("No CUDA-capable GPUs available")
 
-    output_dir = str(base_path / "pythia160m_minipile_trained")
-    log_dir = str(base_path / "160m_minipile_logs") # This turned out to be empty, but I'll leave it here for completemess
+    output_dir = str(base_path / "pythia160m_minipile_self_trained")
+    log_dir = str(base_path / "160m_minipile_self_logs")
     os.makedirs(output_dir, exist_ok=True)
     os.makedirs(log_dir, exist_ok=True)
 
@@ -182,25 +178,23 @@ def training():
     # https://huggingface.co/docs/transformers/v4.46.0/en/main_classes/trainer
     trainer = Trainer(model=empty_model,
                     args=training_args,
-                    train_dataset=minipile_train_tokenized,
-                    eval_dataset=minipile_val_tokenized,
+                    train_dataset=minipile_self_train_tokenized,
+                    eval_dataset=minipile_self_val_tokenized,
                     data_collator=data_collator,
                     optimizers=(optimizer, scheduler))
 
     trainer.train()
 
     # Why is this a two-step process?!
-    trainer.save_model(str(base_path / "pythia160m_minipile_trained")) # This saves the model weights
+    trainer.save_model(str(base_path / "pythia160m_minipile_self_trained")) # This saves the model weights
 
 if __name__ == "__main__":
     training()
 
-# tmux new -s 160m_minipile
+# tmux new -s 160m_minipile_self
 # conda activate minipile
-# torchrun --nproc_per_node=4 02_train_160M.py
+# torchrun --nproc_per_node=4 03_train_160M.py
 # Detach from tmux session: Ctrl-b followed by d
-# Reattach to tmux session: tmux attach -t 160m_minipile
+# Reattach to tmux session: tmux attach -t 160m_minipile_self
 # tmux list-sessions
-# tmux kill-session -t 160m_minipile
-
-# Training took 33.2 hours on gruenau8
+# tmux kill-session -t 160m_minipile_self
