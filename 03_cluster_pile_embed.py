@@ -9,7 +9,7 @@ from pathlib import Path
 from collections import defaultdict
 
 base_path = Path("/vol/tmp/koppelmm")               # Change this to your path
-embd_dir = base_path / "Pile_Deduplicated_Embedded" # This is where the embeddings are stored/written to (create "End_Here.txt" here to signal end)
+embd_dir = base_path / "Pile_Deduplicated_Embd" # This is where the embeddings are stored/written to (create "End_Here.txt" here to signal end)
 cluster_dir = base_path / "MiniPile_BatchKMeans"
 cluster_dir.mkdir(exist_ok=True)
 
@@ -77,6 +77,7 @@ def monitor_and_fit():
         # Files are of format: shard_000000000.parquet
         # Check if there's a new file
         global last_filename
+        global checkpoint_shard_counter
         shards = list(embd_dir.glob("shard_*.parquet"))
         end_signal_given = (embd_dir / "End_Here.txt").exists()
         
@@ -102,7 +103,7 @@ def monitor_and_fit():
             last_shard = sorted(shards)[-1]
             last_modified_time = last_shard.stat().st_mtime
             
-            # Check if the file was modified recently (e.g., within the last 5 minutes)
+            # Check if the file was modified recently (e.g., within the last 6.667 minutes)
             # Back off to have potential writing processes conclude
             if time.time() - last_modified_time < 400: 
                 print(f"Detected recent modification ({time.time() - last_modified_time}). Backing off for another 5 minutes...")
@@ -114,7 +115,6 @@ def monitor_and_fit():
         # Process each individual parquet file
         for shard in shards:
             shardaset = load_dataset("parquet", data_files=str(shard), split="train", streaming=True)
-            #shardaset = load_dataset("parquet", data_files=str(shard), streaming=True)["train"]
             # Process shardaset in batches according to paper
             with tqdm(total=None, desc="Processing Batches") as pbar:
                 for batch in shardaset.iter(batch_size=batch_size):
@@ -126,7 +126,7 @@ def monitor_and_fit():
             checkpoint_shard_counter += 1
 
             # Save the model as checkpoint every 128 shards
-            if checkpoint_shard_counter % 128 == 0:
+            if checkpoint_shard_counter % 4 == 0:
                 np.save(cluster_dir / f"cluster_centers_shard_{checkpoint_shard_counter}.npy", batchified_kmeans.cluster_centers_)
 
         # Place this here to process residual parquet files before
