@@ -97,7 +97,7 @@ class EmbeddingPipeline:
         return load_dataset(
             "parquet",
             data_files={"train": str(self.base_path / "Pile_Deduplicated" / "data" / "train-*.parquet")},
-            cache_dir=str(self.base_path / "MiniPile_Cache"),
+            cache_dir=str(self.base_path / "Pile_Deduplicated_Cache"),
             split="train",
             streaming=True
         )
