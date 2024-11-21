@@ -20,13 +20,13 @@ from transformers import AutoTokenizer, AutoModel
 @dataclass
 class Config:
     base_dir: str = "/vol/tmp/koppelmm"
-    batch_size: int = 256
-    tokenization_batch_size: int = 512
+    batch_size: int = 64                  # We don't actually use this, but it's here for reference
+    tokenization_batch_size: int = 128    # that's the max on 4x A6000
     prefetch_batches: int = 8
-    embedding_dim: int = 768             # Doesn't do anything, but signals use of e5-base-4k
-    shard_size: int = batch_size * 4096  # Embeddings per shard
-    num_worker_threads: int = 8
-    max_length: int = 1024
+    embedding_dim: int = 768              # Doesn't do anything, but signals use of e5-base-4k
+    shard_size: int = batch_size * 16384  # Embeddings per shard
+    num_worker_threads: int = 16
+    max_length: int = 1024                # Contained at 1024 for better depth than e5-large but better speed than 4k
 
 class AsyncWriter:
     def __init__(self, output_dir: Path, config: Config):
@@ -177,8 +177,6 @@ class EmbeddingPipeline:
             
             current_shard_embeddings.extend(embeddings)
             current_shard_texts.extend(original_texts)
-            
-            print(len(current_shard_embeddings), self.config.shard_size)
 
             # Write shard when it reaches the target size
             if len(current_shard_embeddings) >= self.config.shard_size:
@@ -210,11 +208,7 @@ if __name__ == "__main__":
 
 # tmux new -s embed_pile
 # conda activate minipile
-# accelerate launch --multi_gpu --gpu_ids 2,3 --mixed_precision fp16 --num_processes=2 03_embed_pile_dedup.py
-#
-# accelerate launch --mixed_precision fp16 --num_processes=1 03_embed_pile_dedup_sapuko.py
-#
-# DONT DO: accelerate launch --multi_gpu --mixed_precision fp16 --num_processes=4 03_embed_pile_dedup.py # maxes out at 38% usage per card
+# accelerate launch --multi_gpu --mixed_precision fp16 --num_processes=4 03_embed_pile_dedup_turbo.py
 # Detach from tmux session: Ctrl-b followed by d
 # Reattach to tmux session: tmux attach -t embed_pile
 # tmux list-sessions

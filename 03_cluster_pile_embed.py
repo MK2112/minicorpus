@@ -114,6 +114,7 @@ def monitor_and_fit():
         # Process each individual parquet file
         for shard in shards:
             shardaset = load_dataset("parquet", data_files=str(shard), split="train", streaming=True)
+            #shardaset = load_dataset("parquet", data_files=str(shard), streaming=True)["train"]
             # Process shardaset in batches according to paper
             with tqdm(total=None, desc="Processing Batches") as pbar:
                 for batch in shardaset.iter(batch_size=batch_size):
