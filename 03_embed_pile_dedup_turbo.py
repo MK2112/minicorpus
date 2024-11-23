@@ -16,17 +16,16 @@ import pyarrow.parquet as pq
 import torch.nn.functional as F
 from torch import Tensor
 from transformers import AutoTokenizer, AutoModel
-from threading import Lock
 
 @dataclass
 class Config:
     base_dir: str = "/vol/tmp/koppelmm"
-    tokenization_batch_size: int = 128 # that's the max on 4x A6000
-    prefetch_batches: int = 8          # This many batches are pre-loaded for use
-    embedding_dim: int = 768           # Doesn't do anything, but signals use of e5-base-4k
-    shard_size: int = tokenization_batch_size * 8192 # Embeddings per persisted shard, for skip-ahead (0-19, inclusive) (this was too large and got me in trouble)
-    num_worker_threads: int = 8  # 16 didn't bing improvements, this actually helps reaching ~255it/s instead of ~230it/s
-    max_length: int = 1024       # Contained at 1024 for better depth than e5-large but better speed than 4k
+    tokenization_batch_size: int = 128    # that's the max on 4x A6000
+    prefetch_batches: int = 8
+    embedding_dim: int = 768              # Doesn't do anything, but signals use of e5-base-4k
+    shard_size: int = tokenization_batch_size * 8192  # Embeddings per shard
+    num_worker_threads: int = 8
+    max_length: int = 1024                # Contained at 1024 for better depth than e5-large but better speed than 4k
 
 class AsyncWriter:
     def __init__(self, output_dir: Path, config: Config):
@@ -36,12 +35,12 @@ class AsyncWriter:
         self.writer_thread = threading.Thread(target=self._writer_loop, daemon=True)
         self.writer_thread.start()
         self.current_shard = self._get_next_shard_index()
-    
+
     def _get_next_shard_index(self):
         # Count existing parquet files, determine the follow-up shard index
         existing_shards = list(self.output_dir.glob("shard_*.parquet"))
-        return len(existing_shards)
-
+        return int(len(existing_shards))
+        
     def _writer_loop(self):
         while True:
             try:
@@ -55,7 +54,11 @@ class AsyncWriter:
                 shard_path = self.output_dir / f"shard_{self.current_shard:09d}.parquet"
                 pq.write_table(table, str(shard_path))
                 self.current_shard += 1
-                
+
+                # For Memory Efficiency
+                del embeddings
+                del texts
+                del table
             finally:
                 self.write_queue.task_done()
                 
@@ -90,7 +93,6 @@ class EmbeddingPipeline:
         self.config = config
         self.base_path = Path(config.base_dir)
         self.accelerator = Accelerator()
-        self.lock = Lock()
         self.setup_directories()
         
     def setup_directories(self):
@@ -133,16 +135,16 @@ class EmbeddingPipeline:
         inputs = {k: v.to(self.accelerator.device) for k, v in tokenized_batch.items()}
         outputs = self.model(**inputs)
         embeddings = self.average_pool(outputs.last_hidden_state, tokenized_batch['attention_mask'])
-        embeddings = F.normalize(embeddings, p=2, dim=1, out=embeddings)
+        embeddings = F.normalize(embeddings, p=2, dim=1)
         return embeddings.cpu().numpy()
-
+    
     def run(self):
         self.download_model()
         self.load_model()
         dataset = self.load_dataset()
-
+        
         writer = AsyncWriter(self.embd_dir, self.config)
-
+        
         # Check existing shards, adjust processing accordingly
         skip_batches_count = (len(list(self.embd_dir.glob("shard_*.parquet"))) * self.config.shard_size) // self.config.tokenization_batch_size
 
@@ -183,7 +185,7 @@ class EmbeddingPipeline:
         
         # We don't know the total number of batches in advance
         pbar = tqdm(total=None)
-
+        
         while True:
             tokenized_batch = tokenization_output_queue.get()
             if tokenized_batch is None:
@@ -195,13 +197,12 @@ class EmbeddingPipeline:
             current_shard_embeddings.extend(embeddings)
             current_shard_texts.extend(original_texts)
 
-            # Write shard when reaching target size
+            # Write shard when it reaches the target size
             if len(current_shard_embeddings) >= self.config.shard_size:
                 if self.accelerator.is_main_process:
-                    print("Persist to shard...")
                     writer.write(current_shard_embeddings, current_shard_texts)
-                current_shard_embeddings.clear()
-                current_shard_texts.clear()
+                current_shard_embeddings = [] # clear doesn't work here at all.
+                current_shard_texts = []
             
             pbar.update(len(embeddings))
 
