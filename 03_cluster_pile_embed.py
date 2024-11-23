@@ -64,7 +64,7 @@ class ChunkedResultWriter:
     
     def write_result(self, result: Dict[str, Any]):
         if result['idx'] != self.last_written_idx + 1:
-            raise ValueError(f"Out of order write detected.")
+            raise ValueError("Out of order write detected.")
 
         self.current_file.write(json.dumps(result) + '\n')
         self.entries_in_current_chunk += 1
