@@ -1,5 +1,4 @@
 import os
-import gc
 import torch
 import numpy as np
 from tqdm import tqdm
@@ -22,7 +21,7 @@ from transformers import AutoTokenizer, AutoModel
 class Config:
     base_dir: str = "/vol/tmp/koppelmm"
     tokenization_batch_size: int = 128    # That's the max on 4x A6000
-    prefetch_batches: int = 8
+    prefetch_batches: int = 4
     embedding_dim: int = 768              # Doesn't do anything, but signals use of e5-base-4k
     shard_size: int = tokenization_batch_size * 8192  # Embeddings per shard
     num_worker_threads: int = 8
@@ -60,7 +59,6 @@ class AsyncWriter:
                 del embeddings
                 del texts
                 del table
-                gc.collect()
             finally:
                 self.write_queue.task_done()
                 
@@ -89,7 +87,6 @@ class TokenizationWorker:
             tokenized = self.tokenizer(prefixed_texts, max_length=self.config.max_length, 
                                        padding="max_length", truncation=True, return_tensors='pt')
             self.output_queue.put((tokenized, batch['text']))
-            del prefixed_texts
 
 class EmbeddingPipeline:
     def __init__(self, config: Config):
