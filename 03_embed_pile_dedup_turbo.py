@@ -1,4 +1,5 @@
 import os
+import gc
 import torch
 import numpy as np
 from tqdm import tqdm
@@ -20,12 +21,12 @@ from transformers import AutoTokenizer, AutoModel
 @dataclass
 class Config:
     base_dir: str = "/vol/tmp/koppelmm"
-    tokenization_batch_size: int = 128    # that's the max on 4x A6000
+    tokenization_batch_size: int = 128    # That's the max on 4x A6000
     prefetch_batches: int = 8
     embedding_dim: int = 768              # Doesn't do anything, but signals use of e5-base-4k
     shard_size: int = tokenization_batch_size * 8192  # Embeddings per shard
     num_worker_threads: int = 8
-    max_length: int = 1024                # Contained at 1024 for better depth than e5-large but better speed than 4k
+    max_length: int = 1024  # Contained at 1024 for better depth than e5-large but better speed than 4k
 
 class AsyncWriter:
     def __init__(self, output_dir: Path, config: Config):
@@ -59,6 +60,7 @@ class AsyncWriter:
                 del embeddings
                 del texts
                 del table
+                gc.collect()
             finally:
                 self.write_queue.task_done()
                 
@@ -87,6 +89,7 @@ class TokenizationWorker:
             tokenized = self.tokenizer(prefixed_texts, max_length=self.config.max_length, 
                                        padding="max_length", truncation=True, return_tensors='pt')
             self.output_queue.put((tokenized, batch['text']))
+            del prefixed_texts
 
 class EmbeddingPipeline:
     def __init__(self, config: Config):
@@ -167,7 +170,7 @@ class EmbeddingPipeline:
                 # Skip-ahead
                 if batch_c < skip_batches_count:
                     if batch_c % 16384 == 0 and self.accelerator.is_main_process:
-                        # Just an over-the-thumb status update
+                        # I rather have this and some info on the skipping process than .skip() and everything freezing for the same amount of time
                         print(f"Skipped {batch_c}/{skip_batches_count} batches...")
                     batch_c += 1
                     continue
