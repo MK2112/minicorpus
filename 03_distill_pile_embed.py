@@ -7,6 +7,7 @@ import pyarrow as pa
 import pyarrow.parquet as pq
 from tqdm import tqdm
 from collections import defaultdict
+import random
 
 @dataclass
 class FilterConfig:
@@ -36,32 +37,35 @@ class MiniPileFilter:
     def exclude_clusters(self, cluster_ids: List[int]) -> None:
         self.excluded_clusters = set(cluster_ids)
         if len(self.excluded_clusters) != self.config.num_clusters_to_exclude:
-            raise ValueError(f"Must exclude exactly {self.config.num_clusters_to_exclude} clusters.")
+            print(f"[!] Must exclude exactly {self.config.num_clusters_to_exclude} clusters to adhere to the paper. You provided {len(self.excluded_clusters)} clusters.")
         with open(self.config.output_dir / "excluded_clusters.json", "w") as f:
             json.dump({"excluded_clusters": sorted(list(self.excluded_clusters))}, f, indent=2)
     
-    def _get_cluster_thresholds(self) -> Dict[int, float]:
-        # Calculate distance thresholds for each non-excluded cluster
+    def _get_cluster_sample_indices(self) -> Dict[int, Set[int]]:
         results_dir = self.config.cluster_dir / "clustering_results"
-        cluster_distances = defaultdict(list)
-        for chunk_file in tqdm(sorted(results_dir.glob("cluster_results_chunk_*.jsonl")), desc="Accumulating cluster distances"):
+        cluster_indices = defaultdict(list)  # Map cluster_id -> list of document indices (will be ~3.78 GB in memory)
+        sampled_indices = {}
+        # Aggregate indices for each cluster
+        for chunk_file in tqdm(sorted(results_dir.glob("cluster_results_chunk_*.jsonl")), desc="Aggregating cluster indices"):
             with open(chunk_file, 'r') as f:
-                for line in f:
+                for idx, line in enumerate(f):
                     result = json.loads(line)
-                    if result['cluster'] not in self.excluded_clusters:
-                        cluster_distances[result['cluster']].append(result['distance'])
-        thresholds = {}
-        for cluster_id, distances in cluster_distances.items():
-            sorted_distances = sorted(distances)
-            threshold_idx = min(self.config.examples_per_cluster, len(sorted_distances) - 1)
-            thresholds[cluster_id] = sorted_distances[threshold_idx]
-        return thresholds
+                    cluster_id = result['cluster']
+                    if cluster_id in self.excluded_clusters:
+                        continue  # Skip excluded clusters
+                    # Store index for the cluster
+                    cluster_indices[cluster_id].append(idx)
+        # Step 2: Randomly sample `examples_per_cluster` indices for each cluster
+        for cluster_id, indices in cluster_indices.items():
+            # Ensure we sample up to `examples_per_cluster` from the available indices
+            sampled_indices[cluster_id] = set(random.sample(indices, min(self.config.examples_per_cluster, len(indices))))
+        return sampled_indices
 
     def create_minipile(self) -> None:
         if not self.excluded_clusters:
             raise ValueError("Call exclude_clusters() before creating MiniPile.")
-
-        thresholds = self._get_cluster_thresholds()
+        
+        sampled_indices = self._get_cluster_sample_indices()
         total_examples, kept_examples, shard_idx = 0, 0, 0
         output_batch = []
 
@@ -86,7 +90,7 @@ class MiniPileFilter:
                 # Filter embeddings
                 keep_indices = []
                 for i, (cluster_id, distance) in enumerate(cluster_results):
-                    if cluster_id not in self.excluded_clusters and distance <= thresholds[cluster_id]:
+                    if cluster_id not in self.excluded_clusters and i in sampled_indices.get(cluster_id, set()):
                         keep_indices.append(i)
 
                 kept_table = table.take(keep_indices)
