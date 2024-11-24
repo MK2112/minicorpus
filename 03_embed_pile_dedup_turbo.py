@@ -221,6 +221,11 @@ class EmbeddingPipeline:
         for worker in tokenization_workers:
             worker.join()
 
+        # Signal to cluster process
+        if self.accelerator.is_main_process:
+            end_file = self.embd_dir / "End_Here.txt"
+            end_file.touch()
+
         pbar.close()
 
 if __name__ == "__main__":
