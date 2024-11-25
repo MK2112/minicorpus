@@ -1,5 +1,6 @@
 import json
 import time
+import gc
 import numpy as np
 from tqdm import tqdm
 from sklearn.cluster import MiniBatchKMeans
@@ -16,21 +17,19 @@ cluster_dir.mkdir(exist_ok=True)
 
 k_clusters = 220    # As per paper
 batch_size = 16384  # As per paper
-n_init = 3          # Default as nothing else is specified
+n_init = 3          # Default, nothing else is specified
 
 class CosineMiniBatchKMeans(MiniBatchKMeans):
     # Stupidly many parameters, but necessary (https://scikit-learn.org/stable/modules/generated/sklearn.cluster.MiniBatchKMeans.html)
     def __init__(self, n_clusters=8, *, init='k-means++', max_iter=100, batch_size=1024, 
                  verbose=0, compute_labels=True, random_state=None, tol=0.0, 
-                 max_no_improvement=10, init_size=None, n_init='auto', reassignment_ratio=0.01, normalization_interval=10):
+                 max_no_improvement=10, init_size=None, n_init='auto', reassignment_ratio=0.01):
         super().__init__(n_clusters=n_clusters, batch_size=batch_size,
                          init=init, n_init=n_init, max_iter=max_iter,
                          verbose=verbose, random_state=random_state,
                          tol=tol, max_no_improvement=max_no_improvement,
                          reassignment_ratio=reassignment_ratio, 
                          compute_labels=compute_labels, init_size=init_size)
-        self._steps_since_normalization = 0
-        self.normalization_interval = normalization_interval
 
     def _transform(self, X):
         # Prob most lowkey way to enforce using cosine distance
@@ -39,11 +38,8 @@ class CosineMiniBatchKMeans(MiniBatchKMeans):
     def _mini_batch_step(self, X, sample_weight, x_squared_norms, random_reassign=False, n_threads=1):
         # Plainly call original method for batch processing
         super()._mini_batch_step(X, sample_weight, x_squared_norms, random_reassign, n_threads)
-        # Normalize the centroids, remain on unit hypersphere for interpretability (do that every now and then to not slow too much)
-        self._steps_since_normalization += 1
-        if self._steps_since_normalization >= self.normalization_interval:
-            self.cluster_centers_ = self.cluster_centers_ / np.linalg.norm(self.cluster_centers_, axis=1, keepdims=True)
-            self._steps_since_normalization = 0
+        # Normalize the centroids, remain on unit hypersphere for interpretability
+        self.cluster_centers_ = self.cluster_centers_ / np.linalg.norm(self.cluster_centers_, axis=1, keepdims=True)
 
 batchified_kmeans = CosineMiniBatchKMeans(n_clusters=k_clusters, batch_size=batch_size, init='k-means++', 
                                           n_init=n_init, random_state=42)
@@ -69,7 +65,7 @@ class ChunkedResultWriter:
     
     def write_result(self, result: Dict[str, Any]):
         if result['idx'] != self.last_written_idx + 1:
-            raise ValueError("Out of order write detected.")
+            raise ValueError(f"Out of order write detected.")
 
         self.current_file.write(json.dumps(result) + '\n')
         self.entries_in_current_chunk += 1
@@ -130,11 +126,12 @@ last_filename = None         # Load files with indices newer than this only
 checkpoint_shard_counter = 0 # Shard counter for checkpointing centroids
 
 def monitor_and_fit():
+    global last_filename
+    global checkpoint_shard_counter
+    
     while True:
         # Files are of format: shard_000000000.parquet
         # Check if there's a new file
-        global last_filename
-        global checkpoint_shard_counter
         shards = sorted(list(embd_dir.glob("shard_*.parquet")))
         end_signal_given = (embd_dir / "End_Here.txt").exists()
         
@@ -180,7 +177,12 @@ def monitor_and_fit():
                     # Batched fitting
                     batchified_kmeans.partial_fit(embeddings)
                     pbar.update(len(texts))
+                    del embeddings, texts
+                    gc.collect()
             checkpoint_shard_counter += 1
+
+            del shardaset
+            gc.collect()
 
             # Save the model as checkpoint every 128 shards
             if checkpoint_shard_counter % 4 == 0:
@@ -233,6 +235,9 @@ def finalize_clustering():
                 total_processed += len(texts)
                 pbar.update(len(texts))
 
+                del embeddings, texts, labels, distances, batch
+                gc.collect()
+
                 # Periodically update cluster_info
                 if total_processed % (128 * batch_size) == 0:
                     for cluster, info in cluster_info_temp.items():
@@ -243,6 +248,7 @@ def finalize_clustering():
                         cluster_info[cluster]['closest'] = sorted(cluster_info[cluster]['closest'], key=lambda x: x['distance'])[:5]
                         cluster_info[cluster]['farthest'] = sorted(cluster_info[cluster]['farthest'], key=lambda x: x['distance'], reverse=True)[:5]
                     cluster_info_temp.clear()
+                    gc.collect()
         finally:
             writer.close()
 

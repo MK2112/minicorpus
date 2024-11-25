@@ -1,4 +1,5 @@
 import os
+import gc
 import torch
 import numpy as np
 from tqdm import tqdm
@@ -21,10 +22,10 @@ from transformers import AutoTokenizer, AutoModel
 class Config:
     base_dir: str = "/vol/tmp/koppelmm"
     tokenization_batch_size: int = 128    # That's the max on 4x A6000
-    prefetch_batches: int = 4
+    prefetch_batches: int = 2             # Suffices, tested with 4, 8 before
     embedding_dim: int = 768              # Doesn't do anything, but signals use of e5-base-4k
-    shard_size: int = tokenization_batch_size * 8192  # Embeddings per shard
-    num_worker_threads: int = 8
+    shard_size: int = tokenization_batch_size * 4096  # Embeddings per shard (shards 0-51, inclusive, were factor 8192)
+    num_worker_threads: int = 4
     max_length: int = 1024  # Contained at 1024 for better depth than e5-large but better speed than 4k
 
 class AsyncWriter:
@@ -56,9 +57,7 @@ class AsyncWriter:
                 self.current_shard += 1
 
                 # For Memory Efficiency
-                del embeddings
-                del texts
-                del table
+                del embeddings, texts, table
             finally:
                 self.write_queue.task_done()
                 
@@ -87,6 +86,7 @@ class TokenizationWorker:
             tokenized = self.tokenizer(prefixed_texts, max_length=self.config.max_length, 
                                        padding="max_length", truncation=True, return_tensors='pt')
             self.output_queue.put((tokenized, batch['text']))
+            del prefixed_texts
 
 class EmbeddingPipeline:
     def __init__(self, config: Config):
@@ -114,16 +114,27 @@ class EmbeddingPipeline:
     def load_model(self):
         model_path = str(self.base_path / "e5-base-4k")
         self.tokenizer = AutoTokenizer.from_pretrained(model_path, use_fast=True, local_files_only=True)
-        self.model = AutoModel.from_pretrained(model_path, local_files_only=True, attn_implementation="sdpa")
+        self.model = AutoModel.from_pretrained(model_path, local_files_only=True, low_cpu_mem_usage=True, attn_implementation="sdpa")
         self.model = self.accelerator.prepare(self.model)
         self.model.eval()
 
     def load_dataset(self):
-        return load_dataset("parquet",
+        # Check existing shards, skip ahead for processing
+        if len(list(self.embd_dir.glob("shard_*.parquet"))) > 52:
+            skip_items_count = (52 * (self.config.tokenization_batch_size * 8192)) # First 52 shards are large
+            skip_items_count += ((len(list(self.embd_dir.glob("shard_*.parquet")))-52) * self.config.shard_size) # Everything beyond shard 52 is smaller
+        else:
+            # If we test in some other dir, we just run with the standard shard size
+            skip_items_count = (len(list(self.embd_dir.glob("shard_*.parquet"))) * self.config.shard_size)
+        dataset = load_dataset("parquet",
                             data_files={"train": str(self.base_path / "Pile_Deduplicated" / "data" / "train-*.parquet")},
-                            cache_dir=str(self.base_path / "Pile_Deduplicated_Cache"),
+                            cache_dir=None,
                             split="train",
                             streaming=True)
+        if self.accelerator.is_main_process:
+            print(f"Skipping {skip_items_count} items. This may take a while...")
+        dataset = dataset.skip(skip_items_count)
+        return dataset 
     
     def average_pool(self, last_hidden_states: Tensor, attention_mask: Tensor) -> Tensor:
         attention_mask = attention_mask.to(last_hidden_states.device)
@@ -136,7 +147,9 @@ class EmbeddingPipeline:
         outputs = self.model(**inputs)
         embeddings = self.average_pool(outputs.last_hidden_state, tokenized_batch['attention_mask'])
         embeddings = F.normalize(embeddings, p=2, dim=1)
-        return embeddings.cpu().numpy()
+        embeddings_np = embeddings.cpu().numpy()
+        del embeddings, inputs, outputs, tokenized_batch
+        return embeddings_np
     
     def run(self):
         self.download_model()
@@ -144,9 +157,6 @@ class EmbeddingPipeline:
         dataset = self.load_dataset()
         
         writer = AsyncWriter(self.embd_dir, self.config)
-        
-        # Check existing shards, adjust processing accordingly
-        skip_batches_count = (len(list(self.embd_dir.glob("shard_*.parquet"))) * self.config.shard_size) // self.config.tokenization_batch_size
 
         # Create queues for tokenization and inference
         tokenization_input_queue = queue.Queue(maxsize=self.config.prefetch_batches)
@@ -162,15 +172,7 @@ class EmbeddingPipeline:
 
         # Function to feed data to tokenization workers
         def feed_tokenization_workers():
-            batch_c = 0
             for batch in dataset.iter(batch_size=self.config.tokenization_batch_size):
-                # Skip-ahead
-                if batch_c < skip_batches_count:
-                    if batch_c % 16384 == 0 and self.accelerator.is_main_process:
-                        # I rather have this and some info on the skipping process than .skip() and everything freezing for the same amount of time
-                        print(f"Skipped {batch_c}/{skip_batches_count} batches...")
-                    batch_c += 1
-                    continue
                 tokenization_input_queue.put(batch)
             for _ in range(self.config.num_worker_threads):
                 tokenization_input_queue.put(None)
@@ -200,11 +202,18 @@ class EmbeddingPipeline:
             # Write shard when it reaches the target size
             if len(current_shard_embeddings) >= self.config.shard_size:
                 if self.accelerator.is_main_process:
-                    writer.write(current_shard_embeddings, current_shard_texts)
-                current_shard_embeddings = [] # clear doesn't work here at all.
-                current_shard_texts = []
-            
+                    writer.write(current_shard_embeddings[:], current_shard_texts[:])
+                # Wait for the writer to finish this shard
+                writer.write_queue.join()
+                
+                # Now it's safe to delete/clear the lists (as the using writer finished)
+                del current_shard_embeddings[:]
+                del current_shard_texts[:]
+                torch.cuda.empty_cache()
+                gc.collect()
+
             pbar.update(len(embeddings))
+            del tokenized_batch, tokenized, embeddings, original_texts
 
         # Write remaining data
         if current_shard_embeddings and self.accelerator.is_main_process:
@@ -233,7 +242,6 @@ if __name__ == "__main__":
 # tmux new -s embed_pile
 # conda activate minipile
 # accelerate launch --mixed_precision fp16 --num_processes=1 03_embed_pile_dedup_turbo.py
-# You can run this as multi-card process, but ... that won't do anything. Only one process persists. I proofed the script against that, effectively.
 # Detach from tmux session: Ctrl-B followed by D
 # Reattach to tmux session: tmux attach -t embed_pile
 # tmux list-sessions
