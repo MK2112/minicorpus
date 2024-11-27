@@ -15,7 +15,7 @@ class FilterConfig:
     batch_size: int = 16384                                 # Batch size for processing embeddings
     num_clusters: int = 220                                 # Total number of clusters
     num_clusters_to_exclude: int = 38                       # Clusters to exclude
-    examples_per_cluster: int = int(1010500 / num_clusters) # Target examples per cluster
+    examples_per_cluster: int = int(1010500 / (num_clusters - num_clusters_to_exclude)) # Target examples per remaining cluster
     output_shard_size: int = 100_000                        # Examples per output shard
     
     def __post_init__(self):
