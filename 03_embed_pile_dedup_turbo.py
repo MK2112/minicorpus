@@ -22,9 +22,9 @@ from transformers import AutoTokenizer, AutoModel
 class Config:
     base_dir: str = "/vol/tmp/koppelmm"
     tokenization_batch_size: int = 128    # That's the max on 4x A6000
-    prefetch_batches: int = 2             # Suffices, tested with 4, 8 before
+    prefetch_batches: int = 2
     embedding_dim: int = 768              # Doesn't do anything, but signals use of e5-base-4k
-    shard_size: int = tokenization_batch_size * 4096  # Embeddings per shard (shards 0-51, inclusive, were factor 8192)
+    shard_size: int = tokenization_batch_size * 4096  # Embeddings per shard (shards 0-51, inclusive)
     num_worker_threads: int = 4
     max_length: int = 1024  # Contained at 1024 for better depth than e5-large but better speed than 4k
 
@@ -242,7 +242,10 @@ if __name__ == "__main__":
 # tmux new -s embed_pile
 # conda activate minipile
 # accelerate launch --mixed_precision fp16 --num_processes=1 03_embed_pile_dedup_turbo.py
+# You can run this as multi-card process, but ... that won't do anything. Only one process persists.
 # Detach from tmux session: Ctrl-B followed by D
 # Reattach to tmux session: tmux attach -t embed_pile
 # tmux list-sessions
 # tmux kill-session -t embed_pile
+#
+# This took roughly 170 hours.
