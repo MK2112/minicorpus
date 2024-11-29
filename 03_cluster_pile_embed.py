@@ -30,12 +30,13 @@ class CosineMiniBatchKMeans(MiniBatchKMeans):
                          tol=tol, max_no_improvement=max_no_improvement,
                          reassignment_ratio=reassignment_ratio, 
                          compute_labels=compute_labels, init_size=init_size)
+        self._n_threads = 16
 
     def _transform(self, X):
         # Prob most lowkey way to enforce using cosine distance
         return cosine_distances(X, self.cluster_centers_)
 
-    def _mini_batch_step(self, X, sample_weight, x_squared_norms, random_reassign=False, n_threads=1):
+    def _mini_batch_step(self, X, sample_weight, x_squared_norms, random_reassign=False, n_threads=16):
         # Plainly call original method for batch processing
         super()._mini_batch_step(X, sample_weight, x_squared_norms, random_reassign, n_threads)
         # Normalize the centroids, remain on unit hypersphere for interpretability
@@ -164,7 +165,7 @@ def monitor_and_fit():
                 time.sleep(300)  # Wait for an additional 5 minutes
                 continue
 
-        last_filename = sorted(shards)[-1]
+        last_filename = sorted(shards)[-1] if not end_signal_given else ""
 
         # Process each individual parquet file
         for shard in shards:
@@ -194,6 +195,7 @@ def monitor_and_fit():
             break
 
     # After processing all files, save the batchified_kmeans model
+    # cluster_centers.npy
     np.save(cluster_centers_path, batchified_kmeans.cluster_centers_)
     # Continue to predict clusters, save results thereof
     finalize_clustering()
@@ -273,7 +275,13 @@ def finalize_clustering():
     print("Clustering completed.")
 
 if __name__ == "__main__":
-    monitor_and_fit()
+    if cluster_centers_path.exists():
+        print("Saved cluster centers found. Loading and skipping to finalize clustering...")
+        batchified_kmeans.cluster_centers_ = np.load(cluster_centers_path)
+        finalize_clustering()
+    else:
+        print("No cluster centers found. Starting monitor and fit process...")
+        monitor_and_fit()
 
 # tmux new -s cluster_pile
 # conda activate minipile
