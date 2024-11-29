@@ -30,13 +30,13 @@ class CosineMiniBatchKMeans(MiniBatchKMeans):
                          tol=tol, max_no_improvement=max_no_improvement,
                          reassignment_ratio=reassignment_ratio, 
                          compute_labels=compute_labels, init_size=init_size)
-        self._n_threads = 16
+        self._n_threads = 32
 
     def _transform(self, X):
         # Prob most lowkey way to enforce using cosine distance
         return cosine_distances(X, self.cluster_centers_)
 
-    def _mini_batch_step(self, X, sample_weight, x_squared_norms, random_reassign=False, n_threads=16):
+    def _mini_batch_step(self, X, sample_weight, x_squared_norms, random_reassign=False, n_threads=32):
         # Plainly call original method for batch processing
         super()._mini_batch_step(X, sample_weight, x_squared_norms, random_reassign, n_threads)
         # Normalize the centroids, remain on unit hypersphere for interpretability
@@ -64,18 +64,24 @@ class ChunkedResultWriter:
         chunk_path = self.output_dir / f"{self.prefix}_chunk_{self.current_chunk:09d}.jsonl"
         self.current_file = open(chunk_path, 'w', buffering=1)
     
-    def write_result(self, result: Dict[str, Any]):
+    def write_result(self, result: Dict[str, Any]) -> bool:
         if result['idx'] != self.last_written_idx + 1:
-            raise ValueError(f"Out of order write detected.")
+            raise ValueError("Out of order write detected.")
 
-        self.current_file.write(json.dumps(result) + '\n')
-        self.entries_in_current_chunk += 1
-        self.last_written_idx = result['idx']
-        
-        if self.entries_in_current_chunk >= self.chunk_size:
-            self.current_chunk += 1
-            self.entries_in_current_chunk = 0
-            self._open_new_chunk()
+        try:
+            self.current_file.write(json.dumps(result) + '\n')
+            self.entries_in_current_chunk += 1
+            self.last_written_idx = result['idx']
+            
+            if self.entries_in_current_chunk >= self.chunk_size:
+                self.current_chunk += 1
+                self.entries_in_current_chunk = 0
+                self._open_new_chunk()
+            
+            return True
+        except Exception as e:
+            print(f"Error writing result: {e}")
+            return False
     
     def close(self):
         if self.current_file is not None:
@@ -225,7 +231,9 @@ def finalize_clustering():
                         'cluster': int(label),
                         'distance': float(distance)
                     }
-                    writer.write_result(result)
+                    
+                    if writer.write_result(result):
+                        del result
 
                     # Update cluster info
                     cluster = int(label)
@@ -238,7 +246,6 @@ def finalize_clustering():
                 pbar.update(len(texts))
 
                 del embeddings, texts, labels, distances, batch
-                gc.collect()
 
                 # Periodically update cluster_info
                 if total_processed % (128 * batch_size) == 0:
