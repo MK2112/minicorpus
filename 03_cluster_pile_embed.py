@@ -30,13 +30,13 @@ class CosineMiniBatchKMeans(MiniBatchKMeans):
                          tol=tol, max_no_improvement=max_no_improvement,
                          reassignment_ratio=reassignment_ratio, 
                          compute_labels=compute_labels, init_size=init_size)
-        self._n_threads = 16
+        self._n_threads = 32
 
     def _transform(self, X):
         # Prob most lowkey way to enforce using cosine distance
         return cosine_distances(X, self.cluster_centers_)
 
-    def _mini_batch_step(self, X, sample_weight, x_squared_norms, random_reassign=False, n_threads=16):
+    def _mini_batch_step(self, X, sample_weight, x_squared_norms, random_reassign=False, n_threads=32):
         # Plainly call original method for batch processing
         super()._mini_batch_step(X, sample_weight, x_squared_norms, random_reassign, n_threads)
         # Normalize the centroids, remain on unit hypersphere for interpretability
@@ -220,12 +220,33 @@ def finalize_clustering():
     existing_shard_count = int(len(list(cluster_results_dir.glob("cluster_results_chunk_*.jsonl"))))
     skip_items_count = (existing_shard_count - 1) * writer.chunk_size # Assuming only fully written out chunks here, check that first
 
-    # Load all embeddings from all parquet files to cluster them
-    dataset = load_dataset("parquet", data_files=str(embd_dir / "*.parquet"), split="train", streaming=True)
-
     if skip_items_count > 0:
-        print(f"Skipping {skip_items_count} clustered items. This may take a while...")
-        dataset = dataset.skip(skip_items_count)
+        print(f"Skipping {skip_items_count} clustered items...")
+
+        shards = list(embd_dir.glob("*.parquet"))
+        shards.sort()
+
+        # Hard-coded, because its 3AM on a Thursday and your gd machines crash all the time
+        entries_per_shard_52 = 1_048_576
+        entries_per_shard_post = 524_288
+        large_shard_count = 52
+
+        if skip_items_count < large_shard_count * entries_per_shard_52:
+            # Skip captured within first 52 shards
+            shard_index = skip_items_count // entries_per_shard_52
+            local_skip = skip_items_count % entries_per_shard_52
+        else:
+            # Skip captured beyong first 52 shards
+            remaining_skip = skip_items_count - (large_shard_count * entries_per_shard_52)
+            shard_index = large_shard_count + (remaining_skip // entries_per_shard_post)
+            local_skip = remaining_skip % entries_per_shard_post
+
+        print(f'Skip to shard index: {shard_index}\nSkip to local idx: {local_skip}')
+        data_files = shards[shard_index:]
+        dataset = load_dataset("parquet", data_files={"train": [str(file) for file in data_files]}, split="train", streaming=True)
+        dataset = dataset.skip(local_skip)
+    else:
+        dataset = load_dataset("parquet", data_files=str(embd_dir / "*.parquet"), split="train", streaming=True)
 
     total_processed = 0 # Track number of processed examples
     cluster_info_temp = defaultdict(lambda: {'closest': [], 'farthest': [], 'total_examples': 0, 'sum_distance': 0.0})
