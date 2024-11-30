@@ -30,13 +30,13 @@ class CosineMiniBatchKMeans(MiniBatchKMeans):
                          tol=tol, max_no_improvement=max_no_improvement,
                          reassignment_ratio=reassignment_ratio, 
                          compute_labels=compute_labels, init_size=init_size)
-        self._n_threads = 32
+        self._n_threads = 16
 
     def _transform(self, X):
         # Prob most lowkey way to enforce using cosine distance
         return cosine_distances(X, self.cluster_centers_)
 
-    def _mini_batch_step(self, X, sample_weight, x_squared_norms, random_reassign=False, n_threads=32):
+    def _mini_batch_step(self, X, sample_weight, x_squared_norms, random_reassign=False, n_threads=16):
         # Plainly call original method for batch processing
         super()._mini_batch_step(X, sample_weight, x_squared_norms, random_reassign, n_threads)
         # Normalize the centroids, remain on unit hypersphere for interpretability
@@ -46,17 +46,22 @@ batchified_kmeans = CosineMiniBatchKMeans(n_clusters=k_clusters, batch_size=batc
                                           n_init=n_init, random_state=42)
 
 class ChunkedResultWriter:
-    def __init__(self, output_dir: Path, chunk_size: int = 1_000_000, prefix: str = "clustering_results"):
+    def __init__(self, output_dir: Path, chunk_size: int = 1_000_000, prefix: str = "cluster_results"):
         self.output_dir = Path(output_dir)
         self.output_dir.mkdir(exist_ok=True, parents=True)
         self.chunk_size = chunk_size
         self.prefix = prefix
-        self.current_chunk = 0
+        self.current_chunk = self._get_next_chunk_index()
         self.entries_in_current_chunk = 0
         self.current_file = None
         self.last_written_idx = -1
         self._open_new_chunk()
     
+    def _get_next_chunk_index(self):
+        # Count existing jsonl files, determine the follow-up shard index
+        existing_shards = list(self.output_dir.glob(f"{self.prefix}_chunk_*.jsonl"))
+        return int(len(existing_shards))
+
     def _open_new_chunk(self):
         if self.current_file is not None:
             self.current_file.close()
@@ -66,7 +71,7 @@ class ChunkedResultWriter:
     
     def write_result(self, result: Dict[str, Any]) -> bool:
         if result['idx'] != self.last_written_idx + 1:
-            raise ValueError("Out of order write detected.")
+            raise ValueError(f"Out of order write detected.")
 
         try:
             self.current_file.write(json.dumps(result) + '\n')
@@ -207,12 +212,23 @@ def monitor_and_fit():
     finalize_clustering()
 
 def finalize_clustering():
-    # Now load all embeddings from all parquet files to cluster them
-    dataset = load_dataset("parquet", data_files=str(embd_dir / "*.parquet"), split="train", streaming=True)
-    total_processed = 0 # Track number of processed examples
-    cluster_info_temp = defaultdict(lambda: {'closest': [], 'farthest': [], 'total_examples': 0, 'sum_distance': 0.0})
 
     writer = ChunkedResultWriter(output_dir=cluster_dir / "clustering_results", chunk_size=1_000_000, prefix="cluster_results")
+
+    # Count existing parquet files, determine the follow-up shard index
+    cluster_results_dir = cluster_dir / "clustering_results"
+    existing_shard_count = int(len(list(cluster_results_dir.glob("cluster_results_chunk_*.jsonl"))))
+    skip_items_count = (existing_shard_count - 1) * writer.chunk_size # Assuming only fully written out chunks here, check that first
+
+    # Load all embeddings from all parquet files to cluster them
+    dataset = load_dataset("parquet", data_files=str(embd_dir / "*.parquet"), split="train", streaming=True)
+
+    if skip_items_count > 0:
+        print(f"Skipping {skip_items_count} clustered items. This may take a while...")
+        dataset = dataset.skip(skip_items_count)
+
+    total_processed = 0 # Track number of processed examples
+    cluster_info_temp = defaultdict(lambda: {'closest': [], 'farthest': [], 'total_examples': 0, 'sum_distance': 0.0})
 
     with tqdm(total=None, desc="Final Prediction") as pbar:
         try:
