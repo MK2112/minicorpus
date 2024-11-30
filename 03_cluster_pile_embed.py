@@ -42,8 +42,7 @@ class CosineMiniBatchKMeans(MiniBatchKMeans):
         # Normalize the centroids, remain on unit hypersphere for interpretability
         self.cluster_centers_ = self.cluster_centers_ / np.linalg.norm(self.cluster_centers_, axis=1, keepdims=True)
 
-batchified_kmeans = CosineMiniBatchKMeans(n_clusters=k_clusters, batch_size=batch_size, init='k-means++', 
-                                          n_init=n_init, random_state=42)
+batchified_kmeans = CosineMiniBatchKMeans(n_clusters=k_clusters, batch_size=batch_size, init='k-means++', n_init=n_init, random_state=42)
 
 class ChunkedResultWriter:
     def __init__(self, output_dir: Path, chunk_size: int = 1_000_000, prefix: str = "cluster_results"):
@@ -54,7 +53,6 @@ class ChunkedResultWriter:
         self.current_chunk = self._get_next_chunk_index()
         self.entries_in_current_chunk = 0
         self.current_file = None
-        self.last_written_idx = -1
         self._open_new_chunk()
     
     def _get_next_chunk_index(self):
@@ -70,23 +68,21 @@ class ChunkedResultWriter:
         self.current_file = open(chunk_path, 'w', buffering=1)
     
     def write_result(self, result: Dict[str, Any]) -> bool:
-        if result['idx'] != self.last_written_idx + 1:
-            raise ValueError(f"Out of order write detected.")
-
+        success = False
         try:
             self.current_file.write(json.dumps(result) + '\n')
             self.entries_in_current_chunk += 1
-            self.last_written_idx = result['idx']
             
             if self.entries_in_current_chunk >= self.chunk_size:
                 self.current_chunk += 1
                 self.entries_in_current_chunk = 0
                 self._open_new_chunk()
-            
-            return True
+            success = True
         except Exception as e:
             print(f"Error writing result: {e}")
-            return False
+        finally:
+            del result
+            return success
     
     def close(self):
         if self.current_file is not None:
@@ -102,7 +98,6 @@ class ChunkedResultWriter:
         
         with open(self.output_dir / f"{self.prefix}_metadata.json", 'w') as f:
             json.dump(metadata, f, indent=2)
-
 
 # I've seen that being used by Hugging Face for storing results 
 # (https://www.atatus.com/glossary/jsonl/) seems to save some disk space by structure
@@ -133,6 +128,16 @@ cluster_info = {
         'sum_distance': 0.0
     } for i in range(k_clusters)
 }
+
+if cluster_info_path.exists():
+    print("Loading existing cluster information..")
+    with open(cluster_info_path, 'r') as f:
+        existing_cluster_info = json.load(f)
+    # Initialize cluster_info with existing data
+    for cluster_id, info in existing_cluster_info.items():
+        cluster_info[int(cluster_id)] = info
+else:
+    print("Initializing fresh cluster_info..")
 
 last_filename = None         # Load files with indices newer than this only
 checkpoint_shard_counter = 0 # Shard counter for checkpointing centroids
@@ -212,7 +217,6 @@ def monitor_and_fit():
     finalize_clustering()
 
 def finalize_clustering():
-
     writer = ChunkedResultWriter(output_dir=cluster_dir / "clustering_results", chunk_size=1_000_000, prefix="cluster_results")
 
     # Count existing parquet files, determine the follow-up shard index
@@ -226,7 +230,6 @@ def finalize_clustering():
         shards = list(embd_dir.glob("*.parquet"))
         shards.sort()
 
-        # Hard-coded, because its 3AM on a Thursday and your gd machines crash all the time
         entries_per_shard_52 = 1_048_576
         entries_per_shard_post = 524_288
         large_shard_count = 52
@@ -241,14 +244,14 @@ def finalize_clustering():
             shard_index = large_shard_count + (remaining_skip // entries_per_shard_post)
             local_skip = remaining_skip % entries_per_shard_post
 
-        print(f'Skip to shard index: {shard_index}\nSkip to local idx: {local_skip}')
+        print(f'Skip to shard idx: {shard_index}\nSkip to local idx: {local_skip}')
         data_files = shards[shard_index:]
         dataset = load_dataset("parquet", data_files={"train": [str(file) for file in data_files]}, split="train", streaming=True)
         dataset = dataset.skip(local_skip)
     else:
         dataset = load_dataset("parquet", data_files=str(embd_dir / "*.parquet"), split="train", streaming=True)
 
-    total_processed = 0 # Track number of processed examples
+    total_processed = skip_items_count # Track number of processed examples
     cluster_info_temp = defaultdict(lambda: {'closest': [], 'farthest': [], 'total_examples': 0, 'sum_distance': 0.0})
 
     with tqdm(total=None, desc="Final Prediction") as pbar:
@@ -256,6 +259,7 @@ def finalize_clustering():
             for batch in dataset.iter(batch_size=batch_size):
                 embeddings = np.array(batch['embedding'])
                 texts = batch['text']
+                del batch
 
                 # Predict clusters and compute distances
                 labels = batchified_kmeans.predict(embeddings)
@@ -276,16 +280,22 @@ def finalize_clustering():
                     cluster = int(label)
                     cluster_info_temp[cluster]['total_examples'] += 1
                     cluster_info_temp[cluster]['sum_distance'] += distance
-                    cluster_info_temp[cluster]['closest'].append({'text': text, 'distance': distance})
-                    cluster_info_temp[cluster]['farthest'].append({'text': text, 'distance': distance})
+                    text_trunc = text[:256] if len(text) > 256 else text # no need for fulltext, this is enough
+                    cluster_info_temp[cluster]['closest'].append({'text': text_trunc, 'distance': distance})
+                    cluster_info_temp[cluster]['farthest'].append({'text': text_trunc, 'distance': distance})
+                    # Makes me sad to call myself a student but blows up memory otherwise and heapq is a nightmare
+                    if len(cluster_info_temp[cluster]['closest']) > 8:
+                        cluster_info_temp[cluster]['closest'] = sorted(cluster_info_temp[cluster]['closest'], key=lambda x: x['distance'])[:5]
+                        cluster_info_temp[cluster]['farthest'] = sorted(cluster_info_temp[cluster]['farthest'], key=lambda x: x['distance'], reverse=True)[:5]
+                    del text_trunc
                 
                 total_processed += len(texts)
                 pbar.update(len(texts))
 
-                del embeddings, texts, labels, distances, batch
+                del embeddings, texts, labels, distances
 
                 # Periodically update cluster_info
-                if total_processed % (128 * batch_size) == 0:
+                if total_processed % (64 * batch_size) == 0:
                     for cluster, info in cluster_info_temp.items():
                         cluster_info[cluster]['total_examples'] += info['total_examples']
                         cluster_info[cluster]['sum_distance'] += info['sum_distance']
@@ -293,8 +303,10 @@ def finalize_clustering():
                         cluster_info[cluster]['farthest'].extend(info['farthest'])
                         cluster_info[cluster]['closest'] = sorted(cluster_info[cluster]['closest'], key=lambda x: x['distance'])[:5]
                         cluster_info[cluster]['farthest'] = sorted(cluster_info[cluster]['farthest'], key=lambda x: x['distance'], reverse=True)[:5]
-                    cluster_info_temp.clear()
+                    
+                    del cluster_info_temp
                     gc.collect()
+                    cluster_info_temp = defaultdict(lambda: {'closest': [], 'farthest': [], 'total_examples': 0, 'sum_distance': 0.0})
         finally:
             writer.close()
 
