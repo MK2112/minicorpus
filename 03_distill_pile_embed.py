@@ -45,7 +45,7 @@ class MiniPileFilter:
         results_dir = self.config.cluster_dir / "clustering_results"
         cluster_indices = defaultdict(list)  # Map cluster_id -> list of document indices (will be ~3.78 GB in memory)
         sampled_indices = {}
-        # Aggregate indices for each cluster
+        # 1: Aggregate indices for each cluster
         for chunk_file in tqdm(sorted(results_dir.glob("cluster_results_chunk_*.jsonl")), desc="Aggregating cluster indices"):
             with open(chunk_file, 'r') as f:
                 for idx, line in enumerate(f):
@@ -55,7 +55,7 @@ class MiniPileFilter:
                         continue  # Skip excluded clusters
                     # Store index for the cluster
                     cluster_indices[cluster_id].append(idx)
-        # Step 2: Randomly sample `examples_per_cluster` indices for each cluster
+        # 2: Randomly sample `examples_per_cluster` indices for each cluster
         for cluster_id, indices in cluster_indices.items():
             # Ensure we sample up to `examples_per_cluster` from the available indices
             sampled_indices[cluster_id] = set(random.sample(indices, min(self.config.examples_per_cluster, len(indices))))
@@ -121,13 +121,13 @@ class MiniPileFilter:
         with open(self.config.output_dir / "minipile_metadata.json", "w") as f:
             json.dump(metadata, f, indent=2)
 
-        print(f"\nMiniPile created with {kept_examples:,} examples ({metadata['percentage_kept']:.2f}%) across {shard_idx + 1} shards.")
+        print(f"\nMiniPile created with {kept_examples} examples ({metadata['percentage_kept']:.2f}%) across {shard_idx + 1} shards.")
 
     def _write_shard(self, tables: list[pa.Table], shard_idx: int) -> None:
         combined_table = pa.concat_tables(tables)
         shard_path = self.config.output_dir / f"shard_{shard_idx:09d}.parquet"
         pq.write_table(combined_table, shard_path)
-        print(f"Shard {shard_idx} written: {len(combined_table):,} examples.")
+        print(f"Shard {shard_idx} written: {len(combined_table)} examples.")
 
 if __name__ == "__main__":
     config = FilterConfig()

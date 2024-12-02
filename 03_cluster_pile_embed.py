@@ -102,7 +102,7 @@ class ChunkedResultWriter:
 # I've seen that being used by Hugging Face for storing results 
 # (https://www.atatus.com/glossary/jsonl/) seems to save some disk space by structure
 cluster_info_path = cluster_dir / "cluster_info_for_inspection.json"
-clustering_results_path = cluster_dir / "clustering_results.jsonl"
+# clustering_results_path = cluster_dir / "clustering_results.jsonl" # Just symbolizing that I wanted to write one big file. Unused.
 cluster_centers_path = cluster_dir / "cluster_centers.npy"
 
 # Get cos distances using latest centroids
@@ -346,3 +346,6 @@ if __name__ == "__main__":
 # Reattach to tmux session: tmux attach -t cluster_pile
 # tmux list-sessions
 # tmux kill-session -t cluster_pile
+# I tested for index and restart consistency. Nominal.
+#
+# This took roughly 27 hours.
