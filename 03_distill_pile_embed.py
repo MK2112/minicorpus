@@ -18,7 +18,7 @@ class DistillConfig:
     embd_dir: Path = base_dir / "Pile_Deduplicated_Embd"
     num_clusters: int = 220 # As per paper
     num_clusters_to_exclude: int = 38 # As per paper
-    edition: str = "Self" # Version of MiniPile, distinguishes file naming + output directory
+    edition: str = "Recreation" # Version of MiniPile, distinguishes file naming + output directory
     excluded_clusters: Set[int] = field(default_factory=lambda: {10, 15, 16, 22, 26, 28, 35, 37, 39, 40, 44, 46, 
                                                                  51, 57, 61, 64, 78, 86, 87, 88, 90, 94, 99, 101,
                                                                  102, 103, 111, 114, 152, 155, 163, 166, 167, 181,
@@ -27,16 +27,72 @@ class DistillConfig:
     val_count: int = 500
     test_count: int = 10_000 # 1M/500/10k Train/Val/Test total
     examples_per_cluster: int = (train_count + val_count + test_count) // (num_clusters - num_clusters_to_exclude)
+    extra_examples: int = (train_count + val_count + test_count) % (num_clusters - num_clusters_to_exclude)
     output_shard_size: int = 100_000
-    pile_size: int = 134_318_121
+    pile_size: int = 134_318_121 # Could've been read from the metadata file, too
     rng: np.random.Generator = np.random.default_rng(42) # reproducibility
-    
+
     def __post_init__(self):
         # Just nicer and more distinct to place here
         self.output_dir = self.base_dir / f"MiniPile_{self.edition}"
         self.output_dir.mkdir(exist_ok=True, parents=True)
+        # Not used here, but needed later to not hit disk quotas
+        self.cache_dir = self.base_dir / f"MiniPile_{self.edition}_Cache"
+        self.cache_dir.mkdir(exist_ok=True, parents=True)
+        # Distribute the needed extra examples to be drawn from across the clusters most evenly
+        self.cluster_extra_samples = [0] * self.num_clusters
+        extra_examples_left = self.extra_examples
+        # Distribute extra examples across non-excluded clusters
+        for cluster in range(self.num_clusters):
+            if cluster not in self.excluded_clusters and extra_examples_left > 0:
+                self.cluster_extra_samples[cluster] = 1
+                extra_examples_left -= 1
+        # Verify all extra examples are distributed
+        assert extra_examples_left == 0, f"Failed to distribute all extra examples: {extra_examples_left} left"
 
-class MiniPileDistiller:
+class MiniCorpusWriter:
+    def __init__(self, output_dir: Path, edition: str, output_shard_size: int):
+        self.output_dir = output_dir
+        self.edition = edition
+        self.output_shard_size = output_shard_size
+        
+        # Buffers for each split
+        self.buffers = { split : [] for split in ['train', 'validation', 'test'] }
+        # Shard counters for each split
+        self.shard_counters = { split : 0 for split in ['train', 'validation', 'test'] }
+    
+    def _write_shard(self, split: str, force: bool = False):
+        buffer = self.buffers[split]
+        print(f"[~] Writing {split} shard no. {self.shard_counters[split]}")
+        if force or len(buffer) >= self.output_shard_size:
+            # Determine how many documents to write
+            docs_to_write = buffer[:self.output_shard_size] if not force else buffer
+            df = pa.table({'text': [doc['text'] for doc in docs_to_write], 'pile_idx': [doc['idx'] for doc in docs_to_write]})
+            
+            # Write Parquet file
+            output_path = self.output_dir / f"minipile_{self.edition}_{split}_shard_{self.shard_counters[split]:09d}.parquet"
+            pq.write_table(df, output_path)
+            
+            # Update buffer and counter
+            self.buffers[split] = buffer[len(docs_to_write):]
+            self.shard_counters[split] += 1
+            
+            # Cleanup
+            del df
+            gc.collect()
+    
+    def add_document(self, doc: Dict, split: str):
+        self.buffers[split].append(doc)
+        # Write shard if buffer reaches output_shard_size
+        if len(self.buffers[split]) >= self.output_shard_size:
+            self._write_shard(split)
+    
+    def finalize(self):
+        for split in self.buffers:
+            if self.buffers[split]:
+                self._write_shard(split, force=True)
+
+class MiniCorpusDistiller:
     def __init__(self, config: DistillConfig):
         self.config = config
         # Validate configuration parameters for cluster exclusion
@@ -45,6 +101,9 @@ class MiniPileDistiller:
         self._load_total_cluster_info()
         self._compute_shard_scopes()
         self.shard_counter: int = 0
+        self.writer = MiniCorpusWriter(output_dir=config.output_dir,
+                                     edition=config.edition,
+                                     output_shard_size=config.output_shard_size)
     
     def _load_total_cluster_info(self):
         # Load general cluster information JSON file, populate class attribute
@@ -118,7 +177,7 @@ class MiniPileDistiller:
             # Get document indices associcated with cluster
             valid_indices = self._read_idxs_for_cluster(cluster)
             # We want to extract this many examples from the cluster by random sampling
-            return set(self._sample_cluster_docs(valid_indices, self.config.examples_per_cluster))
+            return set(self._sample_cluster_docs(valid_indices, self.config.examples_per_cluster + self.config.cluster_extra_samples[cluster]))
         else:
             return set()
 
@@ -141,7 +200,6 @@ class MiniPileDistiller:
     
     def _process_split(self, split_idxs_to_extract: List[int], split_name: str):
         # Convert split_indices to a set for faster lookup
-        self.shard_counter = 0 # Resets per split
         split_idx_set = set(split_idxs_to_extract)
         # Group indices by shard
         idxs_by_shard = {}
@@ -155,11 +213,15 @@ class MiniPileDistiller:
 
         # The sum of all indices in idxs_by_shard should equal the total number of indices to extract
         assert sum(len(indices) for indices in idxs_by_shard.values()) == len(split_idxs_to_extract)
+        
         # These are the Parquet files that contain the documents
         parquet_files = sorted(Path(self.config.embd_dir).glob("shard_*.parquet"))
         for shard_idx, indices in tqdm(idxs_by_shard.items(), desc=f"Processing {split_name} Shards", unit="shard"):
             # Read the indices accumulated for each shard and persist them to a new Parquet file
             self._process_shard(shard_idx, indices, parquet_files[shard_idx], split_name)
+
+        # Pack up your stuff, we're done with the split
+        self.writer.finalize()
 
     def _process_shard(self, shard_idx: int, idxs_to_extract: List[int], file_path: Path, split_name: str) -> None:
         # Determine shard-local offsets from the global indices
@@ -184,17 +246,9 @@ class MiniPileDistiller:
         # Write out shards based on the configured shard size
         # This is butchered but works, still
         with tqdm(total=len(current_shard_docs), desc=f"Processing Shard {shard_idx}", unit="doc") as pbar:
-            while len(current_shard_docs) >= self.config.output_shard_size:
-                self._write_parquet_shard(current_shard_docs[:self.config.output_shard_size], self.shard_counter, split_name)
-                current_shard_docs = current_shard_docs[self.config.output_shard_size:]
-                self.shard_counter += 1
-                gc.collect()
-                pbar.update(self.config.output_shard_size)
-            # Handle remaining documents
-            if current_shard_docs:
-                self._write_parquet_shard(current_shard_docs, self.shard_counter, split_name)
-                self.shard_counter += 1
-                pbar.update(len(current_shard_docs))
+            for doc in current_shard_docs:
+                self.writer.add_document(doc, split_name)
+                pbar.update(1)
         gc.collect()
 
     def _write_parquet_shard(self, docs: List[Dict], shard_index: int, split_name: str):
@@ -206,7 +260,7 @@ class MiniPileDistiller:
 
 if __name__ == "__main__":
     config = DistillConfig()
-    distiller = MiniPileDistiller(config)
+    distiller = MiniCorpusDistiller(config)
     distiller.build_minipile()
 
 # tmux new -s minipile
@@ -218,4 +272,4 @@ if __name__ == "__main__":
 # tmux list-sessions
 # tmux kill-session -t minipile
 #
-# Took roughly 5 hours.
+# Took roughly 7,5 hours.
