@@ -3,13 +3,12 @@ import json
 import numpy as np
 import jsonlines
 import pyarrow as pa
-import pyarrow.dataset as ds
 import pyarrow.parquet as pq
 from tqdm import tqdm
 from pathlib import Path
 from dataclasses import dataclass, field
 from typing import Set, Dict, List
-from multiprocessing import Pool, Manager, cpu_count
+from multiprocessing import Pool, cpu_count
 
 @dataclass
 class DistillConfig:
@@ -21,14 +20,15 @@ class DistillConfig:
     num_clusters_to_exclude: int = 38 # As per paper
     edition: str = "Self" # Version of MiniPile, distinguishes file naming + output directory
     excluded_clusters: Set[int] = field(default_factory=lambda: {10, 15, 16, 22, 26, 28, 35, 37, 39, 40, 44, 46, 
-                                   51, 57, 61, 64, 78, 86, 87, 88, 90, 94, 99, 101,
-                                   102, 103, 111, 114, 152, 155, 163, 166, 167, 181,
-                                   196, 200, 218, 219})
+                                                                 51, 57, 61, 64, 78, 86, 87, 88, 90, 94, 99, 101,
+                                                                 102, 103, 111, 114, 152, 155, 163, 166, 167, 181,
+                                                                 196, 200, 218, 219})
     train_count: int = 1_000_000
     val_count: int = 500
     test_count: int = 10_000 # 1M/500/10k Train/Val/Test total
-    examples_per_cluster: int = int((train_count + val_count + test_count) / (num_clusters - num_clusters_to_exclude))
+    examples_per_cluster: int = (train_count + val_count + test_count) // (num_clusters - num_clusters_to_exclude)
     output_shard_size: int = 100_000
+    pile_size: int = 134_318_121
     rng: np.random.Generator = np.random.default_rng(42) # reproducibility
     
     def __post_init__(self):
@@ -68,12 +68,13 @@ class MiniPileDistiller:
             self.shard_idxs.append(cumulative_idxs)
             cumulative_idxs += 524_288
 
-        last_shard_size = 134_318_121 - cumulative_idxs
+        last_shard_size = self.config.pile_size - cumulative_idxs
         if last_shard_size > 0:
             self.shard_idxs.append(cumulative_idxs)
 
-    def _get_idxs_for_cluster(self, cluster_idx: int) -> List[int]:
-        # Get document indices assoricated with a given cluster
+
+    def _read_idxs_for_cluster(self, cluster_idx: int) -> List[int]:
+        # Read document indices assoricated with a given cluster
         cluster_file = self.config.cluster_dir / f"cluster_{cluster_idx:03d}.jsonl"
         cluster_indices = []
         with jsonlines.open(cluster_file) as reader:
@@ -82,7 +83,7 @@ class MiniPileDistiller:
                     cluster_indices.append(entry['idx'])
         return cluster_indices
     
-    def _sample_cluster_docs(self, valid_indices: List[int]) -> List[int]:
+    def _sample_cluster_docs(self, valid_indices: List[int], num_samples: int) -> List[int]:
         # Sample documents from cluster, *explicitly* randomly
         # valid_indices are already somewhat shuffled, but we really make sure here, I'm paranoid, that's also why I made it its own function
         # The paper does not explicitly state whether cluster-size-proportioned sampling was applied
@@ -95,97 +96,105 @@ class MiniPileDistiller:
         # Proportional sampling would moreover make it more difficult to hit the specific dataset size goal with the parts of the pipeline that are in fact described.
         #
         # Still, I just have to acknowledge that proportional sampling could have clear advantages here.
-        return self.config.rng.choice(valid_indices, size=min(len(valid_indices), self.config.examples_per_cluster), replace=False).tolist()
+        return self.config.rng.choice(valid_indices, size=min(len(valid_indices), num_samples), replace=False).tolist()
     
     def _shard_with_idx(self, idx: int) -> int:
         # Find the shard containing a specific index by entry count heuristic
+        # Return the shard index as well as the local index within the shard
         for i, _ in enumerate(self.shard_idxs):
             if i + 1 < len(self.shard_idxs) and idx < self.shard_idxs[i + 1]:
                 return i
         return len(self.shard_idxs) - 1
 
-    def _shuffle_split(self, total_docs: int) -> Dict[str, List[int]]:
-        # Chop up for train/val/test splits
-        all_indices = list(range(total_docs))
-        # I want at all cost to avoid having consecutive indices from the same cluster overly represented in the same split
-        self.config.rng.shuffle(all_indices)
-        split = {'train': all_indices[:self.config.train_count],
-                'validation': all_indices[self.config.train_count:(self.config.train_count + self.config.val_count)],
-                'test': all_indices[(self.config.train_count + self.config.val_count):(self.config.train_count + self.config.val_count + self.config.test_count)]}
-        return split
+    def _shuffle_split(self, idxs_to_shuffle: List[int]) -> Dict[str, List[int]]:
+        # Shuffle all_indices, split for train/val/test splits
+        self.config.rng.shuffle(idxs_to_shuffle)
+        return {'train': idxs_to_shuffle[:self.config.train_count],
+                'validation': idxs_to_shuffle[self.config.train_count:(self.config.train_count + self.config.val_count)],
+                'test': idxs_to_shuffle[(self.config.train_count + self.config.val_count):(self.config.train_count + self.config.val_count + self.config.test_count)]}
     
     def _process_cluster(self, cluster: int) -> Set[int]:
         if cluster not in self.config.excluded_clusters:
-            valid_indices = self._get_idxs_for_cluster(cluster)
-            return set(self._sample_cluster_docs(valid_indices))
-        return set()
+            # Get document indices associcated with cluster
+            valid_indices = self._read_idxs_for_cluster(cluster)
+            # We want to extract this many examples from the cluster by random sampling
+            return set(self._sample_cluster_docs(valid_indices, self.config.examples_per_cluster))
+        else:
+            return set()
 
     def build_minipile(self):
-        # Prepare list of document indices to extract using parallel processing
         with Pool(processes=cpu_count() // 2) as pool:
             results = pool.map(self._process_cluster, range(self.config.num_clusters))
-
         # Combine results from all workers
-        total_doc_indices_to_extract = set().union(*results)
-
-        # Generate data splits
-        print(f"[+] Total documents to extract: {len(total_doc_indices_to_extract)}. Shuffling and splitting.")
-        data_splits = self._shuffle_split(len(total_doc_indices_to_extract))
-        
+        idxs_to_extract = sorted(set().union(*results))
+        len_idxs_to_extract = len(idxs_to_extract)
+        # This should show a nice distance between the first and last document index, roughly spanning Pile dataset size
+        print(f"[Info] Min document idx: {idxs_to_extract[0]}, Max document idx: {idxs_to_extract[-1]}")
+        print(f"[+] Total documents to extract: {len_idxs_to_extract}. Shuffling and splitting.")
+        # I want at all cost to avoid having consecutive indices from the same cluster overly represented in the same split
+        data_splits = self._shuffle_split(idxs_to_extract)
+        del idxs_to_extract
         # Process and write documents in splits
-        for split_name, split_indices in tqdm(data_splits.items(), desc="Processing Splits", unit="split"):
-            self._process_split(split_indices, split_name)
-        
-        print(f"[+] MiniPile created with {len(total_doc_indices_to_extract)} documents across train/val/test splits.")
+        for split_name, split_idxs_to_extract in tqdm(data_splits.items(), desc="Processing Splits", unit="split"):
+            self._process_split(split_idxs_to_extract, split_name)
+        print(f"[+] MiniPile created with {len_idxs_to_extract} documents across train/val/test splits.")
     
-    def _process_split(self, split_indices: List[int], split_name: str):
+    def _process_split(self, split_idxs_to_extract: List[int], split_name: str):
         # Convert split_indices to a set for faster lookup
-        split_indices_set = set(split_indices)
-        
+        self.shard_counter = 0 # Resets per split
+        split_idx_set = set(split_idxs_to_extract)
         # Group indices by shard
-        indices_by_shard = {}
-        for idx in tqdm(split_indices, desc=f"Split {split_name} Shard Grouping", unit="doc"):
+        idxs_by_shard = {}
+        # Note which Pile shard each document is in
+        for idx in tqdm(split_idxs_to_extract, desc=f"Split {split_name} Shard Grouping", unit="doc"):
             shard_idx = self._shard_with_idx(idx)
-            if shard_idx not in indices_by_shard:
-                indices_by_shard[shard_idx] = []
-            if idx in split_indices_set:
-                indices_by_shard[shard_idx].append(idx)
+            if shard_idx not in idxs_by_shard:
+                idxs_by_shard[shard_idx] = []
+            if idx in split_idx_set:
+                idxs_by_shard[shard_idx].append(idx)
 
-        assert sum(len(indices) for indices in indices_by_shard.values()) == len(split_indices)
+        # The sum of all indices in idxs_by_shard should equal the total number of indices to extract
+        assert sum(len(indices) for indices in idxs_by_shard.values()) == len(split_idxs_to_extract)
+        # These are the Parquet files that contain the documents
         parquet_files = sorted(Path(self.config.embd_dir).glob("shard_*.parquet"))
+        for shard_idx, indices in tqdm(idxs_by_shard.items(), desc=f"Processing {split_name} Shards", unit="shard"):
+            # Read the indices accumulated for each shard and persist them to a new Parquet file
+            self._process_shard(shard_idx, indices, parquet_files[shard_idx], split_name)
 
-        for shard_idx, indices in tqdm(indices_by_shard.items(), desc=f"Processing {split_name} Shards", unit="shard"):
-            file_path = parquet_files[shard_idx]
-            self._process_shard(shard_idx, indices, file_path, split_name)
-
-    def _process_shard(self, shard_idx: int, indices_to_extract: List[int], file_path: Path, split_name: str) -> int:
-        # Convert global indices to local shard indices
-        local_indices = [idx - self.shard_idxs[shard_idx] for idx in indices_to_extract]
+    def _process_shard(self, shard_idx: int, idxs_to_extract: List[int], file_path: Path, split_name: str) -> None:
+        # Determine shard-local offsets from the global indices
+        idxs_to_extract = sorted(idxs_to_extract)
+        local_idxs = [idx - self.shard_idxs[shard_idx] for idx in idxs_to_extract]
+        
+        assert all(idx >= 0 for idx in local_idxs), f"Negative local index in shard {shard_idx}: {local_idxs}"
+        assert len(local_idxs) == len(set(local_idxs)), f"Duplicate local indices in shard {shard_idx}"
         
         # Read the entire Parquet file
         table = pq.read_table(file_path)
         df = table.to_pandas()
-        selected_df = df.iloc[local_indices].copy() # Select rows matching the local indices using boolean indexing mask
+        selected_df = df.iloc[local_idxs].copy() # Select rows matching the local indices using boolean indexing mask
         del df, table
-        # Add back the global indices
-        selected_df.loc[:, 'idx'] = list(indices_to_extract)
+        
+        # Merge the global indices back in for reference/debugging/fun
+        selected_df.loc[:, 'idx'] = list(idxs_to_extract)
         current_shard_docs = selected_df.to_dict('records')
+        del selected_df
+        gc.collect()
         
         # Write out shards based on the configured shard size
+        # This is butchered but works, still
         with tqdm(total=len(current_shard_docs), desc=f"Processing Shard {shard_idx}", unit="doc") as pbar:
             while len(current_shard_docs) >= self.config.output_shard_size:
                 self._write_parquet_shard(current_shard_docs[:self.config.output_shard_size], self.shard_counter, split_name)
-                del current_shard_docs[:self.config.output_shard_size]
+                current_shard_docs = current_shard_docs[self.config.output_shard_size:]
                 self.shard_counter += 1
                 gc.collect()
                 pbar.update(self.config.output_shard_size)
-
             # Handle remaining documents
             if current_shard_docs:
                 self._write_parquet_shard(current_shard_docs, self.shard_counter, split_name)
                 self.shard_counter += 1
                 pbar.update(len(current_shard_docs))
-        del selected_df
         gc.collect()
 
     def _write_parquet_shard(self, docs: List[Dict], shard_index: int, split_name: str):
@@ -208,3 +217,5 @@ if __name__ == "__main__":
 # Reattach to tmux session: tmux attach -t minipile
 # tmux list-sessions
 # tmux kill-session -t minipile
+#
+# Took roughly 5 hours.
