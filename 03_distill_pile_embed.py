@@ -55,7 +55,6 @@ class MiniCorpusWriter:
         self.output_dir = output_dir
         self.edition = edition
         self.output_shard_size = output_shard_size
-        
         # Buffers for each split
         self.buffers = { split : [] for split in ['train', 'validation', 'test'] }
         # Shard counters for each split
@@ -63,21 +62,17 @@ class MiniCorpusWriter:
     
     def _write_shard(self, split: str, force: bool = False):
         buffer = self.buffers[split]
-        print(f"[~] Writing {split} shard no. {self.shard_counters[split]}")
+        print(f"[~] Writing {split} shard {self.shard_counters[split]}")
         if force or len(buffer) >= self.output_shard_size:
             # Determine how many documents to write
             docs_to_write = buffer[:self.output_shard_size] if not force else buffer
             df = pa.table({'text': [doc['text'] for doc in docs_to_write], 'pile_idx': [doc['idx'] for doc in docs_to_write]})
-            
             # Write Parquet file
             output_path = self.output_dir / f"minipile_{self.edition}_{split}_shard_{self.shard_counters[split]:09d}.parquet"
             pq.write_table(df, output_path)
-            
             # Update buffer and counter
             self.buffers[split] = buffer[len(docs_to_write):]
             self.shard_counters[split] += 1
-            
-            # Cleanup
             del df
             gc.collect()
     
@@ -181,7 +176,7 @@ class MiniCorpusDistiller:
         else:
             return set()
 
-    def build_minipile(self):
+    def build_minicorpus(self):
         with Pool(processes=cpu_count() // 2) as pool:
             results = pool.map(self._process_cluster, range(self.config.num_clusters))
         # Combine results from all workers
@@ -219,7 +214,8 @@ class MiniCorpusDistiller:
         for shard_idx, indices in tqdm(idxs_by_shard.items(), desc=f"Processing {split_name} Shards", unit="shard"):
             # Read the indices accumulated for each shard and persist them to a new Parquet file
             self._process_shard(shard_idx, indices, parquet_files[shard_idx], split_name)
-
+        
+        del idxs_by_shard
         # Pack up your stuff, we're done with the split
         self.writer.finalize()
 
@@ -232,12 +228,16 @@ class MiniCorpusDistiller:
         assert len(local_idxs) == len(set(local_idxs)), f"Duplicate local indices in shard {shard_idx}"
         
         # Read the entire Parquet file
-        table = pq.read_table(file_path)
-        df = table.to_pandas()
-        selected_df = df.iloc[local_idxs].copy() # Select rows matching the local indices using boolean indexing mask
-        del df, table
+        # (https://arrow.apache.org/docs/python/generated/pyarrow.parquet.read_table.html is actually usable)
+        # I needed a compromise for speed and memory usage, so I read the entire file as efficiently as possible, but immediately
+        # selected the columns and filter the rows I actually need.
+        selected_df = pq.read_table(file_path,
+                                    columns=['text'],    # ['text', 'embedding'] contained, 'embedding' is not required here
+                                    use_memory_map=True, # source is a file path, so we can use this
+                                    buffer_size=1024**2, # bytes, default was 0
+                                    use_threads=True).to_pandas().iloc[local_idxs] # .copy() # pandas is a hack to mask out the rows I don't need
         
-        # Merge the global indices back in for reference/debugging/fun
+        # Merging the global indices back in for reference/debugging/fun
         selected_df.loc[:, 'idx'] = list(idxs_to_extract)
         current_shard_docs = selected_df.to_dict('records')
         del selected_df
@@ -251,17 +251,10 @@ class MiniCorpusDistiller:
                 pbar.update(1)
         gc.collect()
 
-    def _write_parquet_shard(self, docs: List[Dict], shard_index: int, split_name: str):
-        # Write a shard of documents to a Parquet file
-        df = pa.table({'text': [doc['text'] for doc in docs], 'pile_idx': [doc['idx'] for doc in docs]})
-        output_path = self.config.output_dir / f"minipile_{self.config.edition}_{split_name}_shard_{shard_index:09d}.parquet"
-        pq.write_table(df, output_path)
-        del df
-
 if __name__ == "__main__":
     config = DistillConfig()
     distiller = MiniCorpusDistiller(config)
-    distiller.build_minipile()
+    distiller.build_minicorpus()
 
 # tmux new -s minipile
 # conda activate minipile
