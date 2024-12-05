@@ -198,7 +198,11 @@ if __name__ == "__main__":
 # tmux new -s 160m_minipile_recreation
 # conda activate minipile
 # torchrun --nproc_per_node=4 03_train_160M_recreation.py
+# I ran with CUDA_VISIBLE_DEVICES=1,2,3 torchrun --nproc_per_node=3 03_train_160M_recreation.py
+# May need to reset in later run, I don't know
 # Detach from tmux session: Ctrl-b followed by d
 # Reattach to tmux session: tmux attach -t 160m_minipile_recreation
 # tmux list-sessions
 # tmux kill-session -t 160m_minipile_recreation
+#
+# This took 15:23:49 h on 3x A6000
