@@ -10,6 +10,7 @@ from pathlib import Path
 from dataclasses import dataclass, field
 from typing import Set, Dict, List
 from multiprocessing import Pool, cpu_count
+from functools import lru_cache
 
 ## Idea 1:
 #   During assembly of the original distillation script, I realized that the dataset consists of differently sized clusters.
@@ -86,6 +87,15 @@ class MiniCorpusWriter:
         for split in self.buffers:
             if self.buffers[split]:
                 self._write_shard(split, force=True)
+
+@lru_cache(maxsize=8)
+def cached_read_parquet(file_path: str) -> np.ndarray:
+    # I forced using numpy and was successful thanks to https://arrow.apache.org/docs/python/numpy.html
+    return pq.read_table(file_path,
+                            columns=['text'],
+                            memory_map=True,
+                            buffer_size=1024**2,
+                            use_threads=True)['text'].to_numpy()
 
 class MiniCorpusDistiller:
     def __init__(self, config: DistillConfig):
@@ -243,17 +253,14 @@ class MiniCorpusDistiller:
         # I needed a compromise for speed and memory usage, so I read the entire file as efficiently as possible, but immediately
         # selected the columns and filter the entries I actually need.
         # This might be the funniest change I made throughout the project, but pandas slowed things down by ~10%.
-        # I forced using numpy and was successful thanks to https://arrow.apache.org/docs/python/numpy.html
-        selected_texts = pq.read_table(file_path,
-                            columns=['text'], # ['text', 'embedding'] contained, 'embedding' is not required here
-                            memory_map=True,  # source is a file path, so we can use this
-                            buffer_size=1024**2, # bytes, default was 0
-                            use_threads=True)['text'].to_numpy()[local_idxs] # Avoid pandas at all costs
+        selected_texts = cached_read_parquet(str(file_path))[local_idxs]
+        
+        # That operation bloats cache like crazy, I had to outsource and clear it, that was hideous
+        cached_read_parquet.cache_clear()
         
         # Merging the global indices back in for reference/debugging/fun
         current_shard_docs = [{'text': text, 'idx': idx} for text, idx in zip(selected_texts, idxs_to_extract)]
         del selected_texts, local_idxs, idxs_to_extract
-        gc.collect()
         
         # Write out shards based on the configured shard size
         # This is butchered but works, still
@@ -261,6 +268,7 @@ class MiniCorpusDistiller:
             for doc in current_shard_docs:
                 self.writer.add_document(doc, split_name)
                 pbar.update(1)
+        del current_shard_docs
         gc.collect()
 
 if __name__ == "__main__":
