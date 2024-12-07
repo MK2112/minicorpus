@@ -3,7 +3,6 @@ import json
 import numpy as np
 import jsonlines
 import pyarrow as pa
-import pyarrow.compute as pc
 import pyarrow.parquet as pq
 from tqdm import tqdm
 from pathlib import Path
@@ -88,7 +87,7 @@ class MiniCorpusWriter:
             if self.buffers[split]:
                 self._write_shard(split, force=True)
 
-@lru_cache(maxsize=8)
+@lru_cache(maxsize=0)
 def cached_read_parquet(file_path: str) -> np.ndarray:
     # I forced using numpy and was successful thanks to https://arrow.apache.org/docs/python/numpy.html
     return pq.read_table(file_path,
@@ -279,7 +278,7 @@ if __name__ == "__main__":
 # tmux new -s mini_1
 # conda activate minipile
 # (pip install jsonlines)
-# python 03_distill_pile_embed_idea_1_proportioned.py
+# python 03_distill_pile_embed_idea_1_proportionate.py
 # Detach from tmux session: Ctrl-b followed by d
 # Reattach to tmux session: tmux attach -t mini_1
 # tmux list-sessions
