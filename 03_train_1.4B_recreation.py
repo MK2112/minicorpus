@@ -19,7 +19,7 @@ base_path = Path(base_dir)
 class CosineSchedulerWithMinLR(_LRScheduler):
     # Basically wrapping the get_cosing_schedule_with_warmup in a lower-bound setting
     # Allows for Cosine Scheduling with a min_lr enforced
-    def __init__(self, optimizer, num_warmup_steps, num_training_steps, min_lr=2e-5):
+    def __init__(self, optimizer, num_warmup_steps, num_training_steps, min_lr):
         self.min_lr = min_lr
         self.base_scheduler = get_cosine_schedule_with_warmup(
             optimizer=optimizer,
@@ -61,13 +61,13 @@ def download_model(down_dir: str, target_folder: str, cache_folder: str, repo_id
             continue
 
 def training():
-    download_model(down_dir=base_dir, target_folder="pythia1.4b_dedup_untrained", 
-                   cache_folder="pythia1.4b_dedup_untrained_Cache",
-                   repo_id="EleutherAI/pythia-1.4b-deduped", branch="step0")
+    #download_model(down_dir=base_dir, target_folder="pythia1.4b_dedup_untrained", 
+    #               cache_folder="pythia1.4b_dedup_untrained_Cache",
+    #               repo_id="EleutherAI/pythia-1.4b-deduped", branch="step0")
 
-    download_model(down_dir=base_dir, target_folder="pythia1.4b_dedup_pile", 
-                   cache_folder="pythia1.4b_dedup_pile_Cache",
-                   repo_id="EleutherAI/pythia-1.4b-deduped", branch="main")
+    #download_model(down_dir=base_dir, target_folder="pythia1.4b_dedup_pile", 
+    #               cache_folder="pythia1.4b_dedup_pile_Cache",
+    #               repo_id="EleutherAI/pythia-1.4b-deduped", branch="main")
 
     minipile_train = load_dataset("parquet",
                                   data_files={
@@ -108,7 +108,7 @@ def training():
         minipile_train_tokenized.save_to_disk(base_path / "minipile_Recreation_train_tokenized")
         minipile_val_tokenized.save_to_disk(base_path / "minipile_Recreation_val_tokenized")
 
-    batch_size = 4     # 8 is too much for 2x A100
+    batch_size = 2 #4 #8 is too much for 3x A100
     total_batch = 1024
 
     # Dynamic padding during training (mlm -> mask language model -> we're doing causal here)
@@ -161,10 +161,13 @@ def training():
         fp16=True,          # Using mixed precision for comparable conditions
         report_to=None,     # Noting this for later iterations, maybe set this as "wandb", "tensorboard" or smth
         ddp_find_unused_parameters=False, # see https://discuss.pytorch.org/t/how-to-change-ddp-parameter-find-unused-parameters-true-to-false-during-training/130763
-        max_grad_norm=1.0,  # As per Pythia 160M paper
+        max_grad_norm=1.0,  # Default Pythia 160M and 1.4B
         dataloader_num_workers=4,
         dataloader_pin_memory=True,
     )
+
+    # Enable gradient checkpointing
+    
 
     # Ensure training across multiple GPUs if available
     device = "cuda" if torch.cuda.is_available() else "cpu"
@@ -199,7 +202,7 @@ if __name__ == "__main__":
 # tmux new -s 14b_minipile_recreation
 # conda activate minipile
 # torchrun --nproc_per_node=4 03_train_1.4B_recreation.py
-# I ran with CUDA_VISIBLE_DEVICES=0,1 torchrun --nproc_per_node=2 03_train_160M_recreation.py
+# I ran with CUDA_VISIBLE_DEVICES=0,1,2 torchrun --nproc_per_node=3 03_train_1.4B_recreation.py
 # Detach from tmux session: Ctrl-b followed by d
 # Reattach to tmux session: tmux attach -t 14b_minipile_recreation
 # tmux list-sessions
