@@ -282,3 +282,5 @@ if __name__ == "__main__":
 # Reattach to tmux session: tmux attach -t mini_21_2
 # tmux list-sessions
 # tmux kill-session -t mini_21_2
+#
+# Took ~2 hours, mostly due to switch to fastparquet.
