@@ -154,15 +154,15 @@ class MiniCorpusDistiller:
     def _read_idxs_for_cluster(self, cluster_idx: int) -> List[int]:
         # Read document indices assoricated with a given cluster
         cluster_file = self.config.cluster_dir / f"cluster_{cluster_idx:03d}.jsonl"
-        cluster_indices = []
+        cluster_idxs = []
         with jsonlines.open(cluster_file) as reader:
             for entry in reader:
                 if entry['cluster'] == cluster_idx:
-                    cluster_indices.append(entry['idx'])
-        return cluster_indices
+                    cluster_idxs.append(entry['idx'])
+        return cluster_idxs
     
-    def _sample_cluster_docs(self, valid_indices: List[int], num_samples: int) -> List[int]:
-        return self.config.rng.choice(valid_indices, size=min(len(valid_indices), num_samples), replace=False).tolist()
+    def _sample_cluster_docs(self, valid_idxs: List[int], num_samples: int) -> List[int]:
+        return self.config.rng.choice(valid_idxs, size=min(len(valid_idxs), num_samples), replace=False).tolist()
     
     def _shard_with_idx(self, idx: int) -> int:
         # Find the shard containing a specific index by entry count heuristic
@@ -224,7 +224,7 @@ class MiniCorpusDistiller:
                 'validation': idxs_to_shuffle[train_count:(train_count + val_count)],
                 'test': idxs_to_shuffle[(train_count + val_count):(train_count + val_count + test_count)]}
     
-    def _get_texts_for_indices(self, idxs: List[int]) -> List[tuple]:
+    def _get_texts_for_idxs(self, idxs: List[int]) -> List[tuple]:
         # Group indices by shard to minimize I/O
         idxs_by_shard = {}
         for idx in idxs:
@@ -245,28 +245,28 @@ class MiniCorpusDistiller:
     def _process_cluster(self, cluster: int) -> Set[int]:
         if cluster not in self.config.excluded_clusters:
             # Get document indices associcated with cluster
-            valid_indices = self._read_idxs_for_cluster(cluster)
+            valid_idxs = self._read_idxs_for_cluster(cluster)
             # Total number of documents in the non-excluded clusters
-            total_indices_sum = sum(self._read_size_for_cluster(cluster) for cluster in range(self.config.num_clusters) if cluster not in self.config.excluded_clusters)
-            cluster_proportion = len(valid_indices) / total_indices_sum
-            del total_indices_sum
+            total_idxs_sum = sum(self._read_size_for_cluster(cluster) for cluster in range(self.config.num_clusters) if cluster not in self.config.excluded_clusters)
+            cluster_proportion = len(valid_idxs) / total_idxs_sum
+            del total_idxs_sum
             # Ensure we don't exceed available indices by accident
-            oversamples_for_this_cluster = min(int((self.config.train_count + self.config.val_count + self.config.test_count) * cluster_proportion * self.config.oversampling_factor), len(valid_indices))
+            oversamples_for_this_cluster = min(int((self.config.train_count + self.config.val_count + self.config.test_count) * cluster_proportion * self.config.oversampling_factor), len(valid_idxs))
             del cluster_proportion
-            oversampled_indices = self._sample_cluster_docs(valid_indices, oversamples_for_this_cluster)
-            del oversamples_for_this_cluster, valid_indices
+            oversampled_idxs = self._sample_cluster_docs(valid_idxs, oversamples_for_this_cluster)
+            del oversamples_for_this_cluster, valid_idxs
             # Retrieve full texts for these sampled documents
-            oversampled_texts_with_indices = self._get_texts_for_indices(oversampled_indices)
-            del oversampled_indices
-            oversampled_losses = self._calculate_loss([text for text, _ in oversampled_texts_with_indices])
-            oversampled_documents = list(zip(oversampled_losses, oversampled_texts_with_indices))
-            del oversampled_losses, oversampled_texts_with_indices
+            oversampled_texts_with_idxs = self._get_texts_for_idxs(oversampled_idxs)
+            del oversampled_idxs
+            oversampled_losses = self._calculate_loss([text for text, _ in oversampled_texts_with_idxs])
+            oversampled_documents = list(zip(oversampled_losses, oversampled_texts_with_idxs))
+            del oversampled_losses, oversampled_texts_with_idxs
             # Sort oversampled_documents by loss in descending order and slice for the top half
             oversampled_documents.sort(key=lambda x: x[0], reverse=True)
             # print(f"[Info] Cluster {cluster} Losses: {oversampled_documents[0][0]} - {oversampled_documents[-1][0]}")
-            sampled_indices = [idx for _, (_, idx) in oversampled_documents[:len(oversampled_documents) // 2]]
+            sampled_idxs = [idx for _, (_, idx) in oversampled_documents[:len(oversampled_documents) // 2]]
             del oversampled_documents
-            return set(sampled_indices)
+            return set(sampled_idxs)
         else:
             return set()
 
@@ -301,13 +301,13 @@ class MiniCorpusDistiller:
                 idxs_by_shard[shard_idx].append(idx)
 
         # The sum of all indices in idxs_by_shard should equal the total number of indices to extract
-        assert sum(len(indices) for indices in idxs_by_shard.values()) == len(split_idxs_to_extract)
+        assert sum(len(idxs) for idxs in idxs_by_shard.values()) == len(split_idxs_to_extract)
         
         # These are the Parquet files that contain the documents
         parquet_files = sorted(Path(self.config.embd_dir).glob("shard_*.parquet"))
-        for shard_idx, indices in tqdm(idxs_by_shard.items(), desc=f"Processing {split_name} Shards", unit="shard"):
+        for shard_idx, idxs in tqdm(idxs_by_shard.items(), desc=f"Processing {split_name} Shards", unit="shard"):
             # Read the indices accumulated for each shard and persist them to a new Parquet file
-            self._process_shard(shard_idx, indices, parquet_files[shard_idx], split_name)
+            self._process_shard(shard_idx, idxs, parquet_files[shard_idx], split_name)
         
         del idxs_by_shard
         # Pack up your stuff, we're done with the split

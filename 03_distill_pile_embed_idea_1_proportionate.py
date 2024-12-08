@@ -138,15 +138,15 @@ class MiniCorpusDistiller:
     def _read_idxs_for_cluster(self, cluster_idx: int) -> List[int]:
         # Read document indices assoricated with a given cluster
         cluster_file = self.config.cluster_dir / f"cluster_{cluster_idx:03d}.jsonl"
-        cluster_indices = []
+        cluster_idxs = []
         with jsonlines.open(cluster_file) as reader:
             for entry in reader:
                 if entry['cluster'] == cluster_idx:
-                    cluster_indices.append(entry['idx'])
-        return cluster_indices
+                    cluster_idxs.append(entry['idx'])
+        return cluster_idxs
     
-    def _sample_cluster_docs(self, valid_indices: List[int], num_samples: int) -> List[int]:
-        return self.config.rng.choice(valid_indices, size=min(len(valid_indices), num_samples), replace=False).tolist()
+    def _sample_cluster_docs(self, valid_idxs: List[int], num_samples: int) -> List[int]:
+        return self.config.rng.choice(valid_idxs, size=min(len(valid_idxs), num_samples), replace=False).tolist()
     
     def _shard_with_idx(self, idx: int) -> int:
         # Find the shard containing a specific index by entry count heuristic
@@ -184,15 +184,15 @@ class MiniCorpusDistiller:
     def _process_cluster(self, cluster: int) -> Set[int]:
         if cluster not in self.config.excluded_clusters:
             # Get document indices associcated with cluster
-            valid_indices = self._read_idxs_for_cluster(cluster)
+            valid_idxs = self._read_idxs_for_cluster(cluster)
             # Total number of documents in the non-excluded clusters
-            total_indices_sum = sum(self._read_size_for_cluster(cluster) for cluster in range(self.config.num_clusters) if cluster not in self.config.excluded_clusters)
-            cluster_proportion = len(valid_indices) / total_indices_sum
-            del total_indices_sum
+            total_idxs_sum = sum(self._read_size_for_cluster(cluster) for cluster in range(self.config.num_clusters) if cluster not in self.config.excluded_clusters)
+            cluster_proportion = len(valid_idxs) / total_idxs_sum
+            del total_idxs_sum
             # Ensure we don't exceed available indices by accident
-            samples_for_this_cluster = min(int((self.config.train_count + self.config.val_count + self.config.test_count) * cluster_proportion), len(valid_indices))
+            samples_for_this_cluster = min(int((self.config.train_count + self.config.val_count + self.config.test_count) * cluster_proportion), len(valid_idxs))
             del cluster_proportion
-            return set(self._sample_cluster_docs(valid_indices, samples_for_this_cluster))
+            return set(self._sample_cluster_docs(valid_idxs, samples_for_this_cluster))
         else:
             return set()
 
@@ -227,13 +227,13 @@ class MiniCorpusDistiller:
                 idxs_by_shard[shard_idx].append(idx)
 
         # The sum of all indices in idxs_by_shard should equal the total number of indices to extract
-        assert sum(len(indices) for indices in idxs_by_shard.values()) == len(split_idxs_to_extract)
+        assert sum(len(idxs) for idxs in idxs_by_shard.values()) == len(split_idxs_to_extract)
         
         # These are the Parquet files that contain the documents
         parquet_files = sorted(Path(self.config.embd_dir).glob("shard_*.parquet"))
-        for shard_idx, indices in tqdm(idxs_by_shard.items(), desc=f"Processing {split_name} Shards", unit="shard"):
+        for shard_idx, idxs in tqdm(idxs_by_shard.items(), desc=f"Processing {split_name} Shards", unit="shard"):
             # Read the indices accumulated for each shard and persist them to a new Parquet file
-            self._process_shard(shard_idx, indices, parquet_files[shard_idx], split_name)
+            self._process_shard(shard_idx, idxs, parquet_files[shard_idx], split_name)
         
         del idxs_by_shard
         # Pack up your stuff, we're done with the split

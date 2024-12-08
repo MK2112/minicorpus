@@ -112,11 +112,11 @@ def compute_distances(embeddings, centroids, labels):
 # Get closest and farthest examples for a cluster
 def get_extreme_examples(embeddings, labels, centroids, texts, n=5):
     distances = cosine_distances(embeddings, centroids[labels]).diagonal()
-    sorted_indices = np.argsort(distances)
-    closest_indices = sorted_indices[:n]   # First n
-    farthest_indices = sorted_indices[-n:] # Furthest n, thank god for slicing
-    return ([{"text": texts[idx], "distance": distances[idx]} for idx in closest_indices],
-            [{"text": texts[idx], "distance": distances[idx]} for idx in farthest_indices])
+    sorted_idxs = np.argsort(distances)
+    closest_idxs = sorted_idxs[:n]   # First n
+    farthest_idxs = sorted_idxs[-n:] # Furthest n, thank god for slicing
+    return ([{"text": texts[idx], "distance": distances[idx]} for idx in closest_idxs],
+            [{"text": texts[idx], "distance": distances[idx]} for idx in farthest_idxs])
 
 # Cluster tracking infos
 cluster_info = {

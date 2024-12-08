@@ -59,8 +59,8 @@ class LossiConfig:
         self.output_loss_path.parent.mkdir(parents=True, exist_ok=True)
 
 def process_cluster_texts(args):
-    cluster_idx, valid_indices, sampled_texts = args
-    cluster_texts = [txt[0] for txt in sampled_texts if txt[1] in valid_indices]
+    cluster_idx, valid_idxs, sampled_texts = args
+    cluster_texts = [txt[0] for txt in sampled_texts if txt[1] in valid_idxs]
     return cluster_idx, cluster_texts
 
 class LossiSampler:
@@ -104,15 +104,15 @@ class LossiSampler:
     def _read_idxs_for_cluster(self, cluster_idx: int) -> List[int]:
         # Read document indices assoricated with a given cluster
         cluster_file = self.config.cluster_dir / f"cluster_{cluster_idx:03d}.jsonl"
-        cluster_indices = []
+        cluster_idxs = []
         with jsonlines.open(cluster_file) as reader:
             for entry in reader:
                 if entry['cluster'] == cluster_idx:
-                    cluster_indices.append(entry['idx'])
-        return cluster_indices
+                    cluster_idxs.append(entry['idx'])
+        return cluster_idxs
 
-    def _sample_cluster_docs(self, valid_indices: List[int]) -> List[int]:
-        return self.config.rng.choice(valid_indices, size=min(len(valid_indices), self.config.documents_per_cluster), replace=False).tolist()
+    def _sample_cluster_docs(self, valid_idxs: List[int]) -> List[int]:
+        return self.config.rng.choice(valid_idxs, size=min(len(valid_idxs), self.config.documents_per_cluster), replace=False).tolist()
 
     def _shard_with_idx(self, idx: int) -> int:
         # Find the shard containing a specific index by entry count heuristic
@@ -132,7 +132,7 @@ class LossiSampler:
         del parquet
         return result
 
-    def _get_texts_for_indices(self, idxs: List[int]) -> List[tuple]:
+    def _get_texts_for_idxs(self, idxs: List[int]) -> List[tuple]:
         # Group indices by shard to minimize I/O
         idxs_by_shard = {}
         for idx in idxs:
@@ -174,28 +174,28 @@ class LossiSampler:
 
     def calculate_losses(self):
         if not os.path.exists(self.config.base_dir / f"MiniPile_{self.config.edition}/sampled_texts_dict.json"):
-            all_indices = []
-            valid_indices_cluster = {}
+            all_idxs = []
+            valid_idxs_cluster = {}
             for cluster_idx in tqdm(range(self.config.num_clusters), desc="Reading Cluster Indices", unit="cluster"):
                 if cluster_idx in self.config.excluded_clusters:
                     continue
-                valid_indices = self._read_idxs_for_cluster(cluster_idx)
-                valid_indices_cluster[cluster_idx] = valid_indices
-                all_indices.extend(self._sample_cluster_docs(valid_indices))
+                valid_idxs = self._read_idxs_for_cluster(cluster_idx)
+                valid_idxs_cluster[cluster_idx] = valid_idxs
+                all_idxs.extend(self._sample_cluster_docs(valid_idxs))
 
-            sampled_texts = self._get_texts_for_indices(all_indices)
+            sampled_texts = self._get_texts_for_idxs(all_idxs)
             sampled_texts_dict = {}
             
             with multiprocessing.Pool(processes=max(1, multiprocessing.cpu_count() // 2)) as pool:
-                cluster_args = [(cluster_idx, valid_indices, sampled_texts)
-                                for cluster_idx, valid_indices in valid_indices_cluster.items()
+                cluster_args = [(cluster_idx, valid_idxs, sampled_texts)
+                                for cluster_idx, valid_idxs in valid_idxs_cluster.items()
                                 if cluster_idx not in self.config.excluded_clusters]
                 results_iter = tqdm(pool.imap_unordered(process_cluster_texts, cluster_args), 
                                     total=len(cluster_args), 
                                     desc="Grouping Sampled Texts", 
                                     unit="cluster")
                 sampled_texts_dict = dict(results_iter)
-            del sampled_texts, all_indices, valid_indices_cluster
+            del sampled_texts, all_idxs, valid_idxs_cluster
 
             # Persist sampled_texts_dict to disk for if something goes wrong
             with open(self.config.base_dir / f"MiniPile_{self.config.edition}/sampled_texts_dict.json", "w") as f:
