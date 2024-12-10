@@ -15,19 +15,11 @@ from fastparquet import ParquetFile
 #   Lossi (Loss-informed Sampling) is a one-shot proxy-based geometric sampling approach that is guided by a loss-based importance heuristic, 
 #   deviating from the original distillation process in the following ways:
 #
-#   Idea 2.1 covers these adaptations:
 #   - Per cluster: Uniformly sample $n$ (e.g. $1,000$) documents and determine their loss with a small Pythia $70\text{M}$ proxy model
 #   - Use the mean loss as a heuristic for the cluster's informativeness and weight the cluster's representation in the final dataset by this value
-#
-#   Idea 2.2 covers these adaptations:
-#   - The loss-proportional sampling information from Idea 2.1 is used to guide the cluster-wise random sampling process
-#   - Per cluster: Randomly sample $1.5\times$ the amount of documents we want to end up with from each non-excluded cluster
-#   - Per cluster: Calculate the loss for each sampled document with a small Pythia $70\text{M}$ proxy model which itself was pretrained halfway through (`step72000`) The Pile Deduped.
-#   - Per cluster: Sort the documents by their loss and select the top half of the documents with the highest loss for the final dataset
-#   - We continue with the dataset assembly as before after that.
 
 # This is a lot. To make this resource-effectively applicable, I split this into several scripts.
-# This is script 2 of idea 2.1:
+# This is script 2 of idea 2:
 #   - Use the 'cluster_loss.jsonl' to - per cluster - read the count of documents to sample, assembing "MiniPile_Lossi_1"
 
 @dataclass
@@ -275,12 +267,12 @@ if __name__ == "__main__":
     distiller = MiniCorpusDistiller(config)
     distiller.build_minicorpus()
 
-# tmux new -s mini_21_2
+# tmux new -s mini_2
 # conda activate minipile
 # python 03_distill_pile_embed_idea_2.1_lossi_2.py
 # Detach from tmux session: Ctrl-b followed by d
-# Reattach to tmux session: tmux attach -t mini_21_2
+# Reattach to tmux session: tmux attach -t mini_2
 # tmux list-sessions
-# tmux kill-session -t mini_21_2
+# tmux kill-session -t mini_2
 #
 # Took ~2 hours, mostly due to switch to fastparquet.

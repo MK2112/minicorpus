@@ -17,19 +17,11 @@ from transformers import AutoModelForCausalLM, AutoTokenizer
 #   Lossi (Loss-informed Sampling) is a one-shot proxy-based geometric sampling approach that is guided by a loss-based importance heuristic, 
 #   deviating from the original distillation process in the following ways:
 #
-#   Idea 2.1 covers these adaptations:
 #   - Per cluster: Uniformly sample $n$ (e.g. $1,000$) documents and determine their loss with a small Pythia $70\text{M}$ proxy model
 #   - Use the mean loss as a heuristic for the cluster's informativeness and weight the cluster's representation in the final dataset by this value
-#
-#   Idea 2.2 covers these adaptations:
-#   - The loss-proportional sampling information from Idea 2.1 is used to guide the cluster-wise random sampling process
-#   - Per cluster: Randomly sample $1.5\times$ the amount of documents we want to end up with from each non-excluded cluster
-#   - Per cluster: Calculate the loss for each sampled document with a small Pythia $70\text{M}$ proxy model which itself was pretrained halfway through (`step72000`) The Pile Deduped.
-#   - Per cluster: Sort the documents by their loss and select the top half of the documents with the highest loss for the final dataset
-#   - We continue with the dataset assembly as before after that.
 
 # This is a lot. To make this resource-effectively applicable, I split this into several scripts.
-# This is script 1 of Idea 2.1:
+# This is script 1 of Idea 2:
 #   - Per cluster: Uniformly sample $n$ (e.g. $134,318,121\ \text{documents} / (220\ \text{clusters} \times 100)$) documents from each cluster and determine their loss with a small Pythia $70\text{M}$ proxy model
 #   - Persist cluster-wise the mean loss as a heuristic for the cluster's informativeness and weight the cluster's sample factor accordingly
 
@@ -236,14 +228,14 @@ if __name__ == "__main__":
     sampler.persist_results(cluster_losses, cluster_proportions)
     print(f"[+] Mean losses saved to {config.output_loss_path}")
 
-# tmux new -s mini_2_1
+# tmux new -s mini_2
 # conda activate minipile
 #
-# CUDA_VISIBLE_DEVICES=2 python 03_distill_pile_embed_idea_2.1_lossi_1.py
+# CUDA_VISIBLE_DEVICES=2 python 03_distill_pile_embed_idea_2_lossi_1.py
 #  
 # Detach from tmux session: Ctrl-b followed by d
-# Reattach to tmux session: tmux attach -t mini_2_1
+# Reattach to tmux session: tmux attach -t mini_2
 # tmux list-sessions
-# tmux kill-session -t mini_2_1
+# tmux kill-session -t mini_2
 #
 # This took ~4.5 hours on a single A6000
