@@ -9,15 +9,7 @@ from pathlib import Path
 from dataclasses import dataclass, field
 from typing import Set, Dict, List
 from multiprocessing import Pool, cpu_count
-from functools import lru_cache
-
-## Idea 1:
-#   During assembly of the original distillation script, I realized that the dataset consists of differently sized clusters.
-#   However, and the benchmarks seem to confirm that, the methodology actually samples equal amounts of examples from each non-excluded cluster.
-#   At worst, this can lead to introduction of bias, at best, it's a missed opportunity to make the dataset more or representative of its source.
-#   I therefore propose to sample examples from each cluster proportionally to its size, in hopes of making the dataset more representative.
-#   I expect benchmarks of the original (recreation) and the proportional (proportioned) sampling to show that the proportional sampling is more representative."
-#   This pretty much lifts the fixed-size constraint, but we'll use it for an upper bound on the dataset size.
+from fastparquet import ParquetFile
 
 @dataclass
 class DistillConfig:
@@ -27,7 +19,8 @@ class DistillConfig:
     embd_dir: Path = base_dir / "Pile_Deduplicated_Embd"
     num_clusters: int = 220 # As per paper
     num_clusters_to_exclude: int = 38 # As per paper
-    edition: str = "Proportioned" # Version of MiniPile, distinguishes file naming + output directory
+    density_weight: float = 0.5
+    edition: str = "DensityProportioned" # Version of MiniPile, distinguishes file naming + output directory
     excluded_clusters: Set[int] = field(default_factory=lambda: {10, 15, 16, 22, 26, 28, 35, 37, 39, 40, 44, 46, 
                                                                  51, 57, 61, 64, 78, 86, 87, 88, 90, 94, 99, 101,
                                                                  102, 103, 111, 114, 152, 155, 163, 166, 167, 181,
@@ -48,7 +41,6 @@ class DistillConfig:
         # Not used here, but needed later to not hit disk quotas
         self.cache_dir = self.base_dir / f"MiniPile_{self.edition}_Cache"
         self.cache_dir.mkdir(exist_ok=True, parents=True)
-        # I kicked out the 'extra_examples' part, because it's not needed where we're going
 
 class MiniCorpusWriter:
     def __init__(self, output_dir: Path, edition: str, output_shard_size: int):
@@ -86,15 +78,6 @@ class MiniCorpusWriter:
         for split in self.buffers:
             if self.buffers[split]:
                 self._write_shard(split, force=True)
-
-@lru_cache(maxsize=0)
-def cached_read_parquet(file_path: str) -> np.ndarray:
-    # I forced using numpy and was successful thanks to https://arrow.apache.org/docs/python/numpy.html
-    return pq.read_table(file_path,
-                            columns=['text'],
-                            memory_map=True,
-                            buffer_size=1024**2,
-                            use_threads=True)['text'].to_numpy()
 
 class MiniCorpusDistiller:
     def __init__(self, config: DistillConfig):
@@ -134,6 +117,10 @@ class MiniCorpusDistiller:
 
     def _read_size_for_cluster(self, cluster_idx: int) -> int:
         return self.cluster_info[str(cluster_idx)]['total_examples']
+    
+    def _get_density(self, cluster_idx: int) -> float:
+        # We have the fields 'total_examples', 'average_distance' and 'sum_distance' in the cluster info, using that to calculate the density of a cluster
+        return self.cluster_info[str(cluster_idx)]['sum_distance'] / self.cluster_info[str(cluster_idx)]['total_examples'] if self.cluster_info[str(cluster_idx)]['total_examples'] > 0 else 0.0
 
     def _read_idxs_for_cluster(self, cluster_idx: int) -> List[int]:
         # Read document indices assoricated with a given cluster
@@ -186,9 +173,12 @@ class MiniCorpusDistiller:
             # Get document indices associcated with cluster
             valid_idxs = self._read_idxs_for_cluster(cluster)
             # Total number of documents in the non-excluded clusters
+            cluster_size = self._read_size_for_cluster(cluster)
             total_idxs_sum = sum(self._read_size_for_cluster(cluster) for cluster in range(self.config.num_clusters) if cluster not in self.config.excluded_clusters)
-            cluster_proportion = len(valid_idxs) / total_idxs_sum
-            del total_idxs_sum
+            density = self._get_density(cluster)
+            # Proportion of documents to sample from this cluster. Favor sparse clusters for more diverse samples
+            cluster_proportion = cluster_size / total_idxs_sum * (1 - self.config.density_weight * density) # The density is subtracted from 1 to favor diverse / sparse clusters
+            del total_idxs_sum, density, cluster_size
             # Ensure we don't exceed available indices by accident
             samples_for_this_cluster = min(int((self.config.train_count + self.config.val_count + self.config.test_count) * cluster_proportion), len(valid_idxs))
             del cluster_proportion
@@ -239,6 +229,12 @@ class MiniCorpusDistiller:
         # Pack up your stuff, we're done with the split
         self.writer.finalize()
 
+    def _read_fast_parquet(self, file_path: str, idxs: List[int]) -> np.ndarray:
+        parquet = ParquetFile(file_path) # https://github.com/dask/fastparquet/issues/386
+        result = parquet.to_pandas(columns=['text'])['text'].to_numpy()[idxs]
+        del parquet
+        return result
+
     def _process_shard(self, shard_idx: int, idxs_to_extract: List[int], file_path: Path, split_name: str) -> None:
         # Determine shard-local offsets from the global indices
         idxs_to_extract = sorted(idxs_to_extract)
@@ -252,10 +248,7 @@ class MiniCorpusDistiller:
         # I needed a compromise for speed and memory usage, so I read the entire file as efficiently as possible, but immediately
         # selected the columns and filter the entries I actually need.
         # This might be the funniest change I made throughout the project, but pandas slowed things down by ~10%.
-        selected_texts = cached_read_parquet(str(file_path))[local_idxs]
-        
-        # That operation bloats cache like crazy, I had to outsource and clear it, that was hideous
-        cached_read_parquet.cache_clear()
+        selected_texts = self._read_fast_parquet(str(file_path), local_idxs)
         
         # Merging the global indices back in for reference/debugging/fun
         current_shard_docs = [{'text': text, 'idx': idx} for text, idx in zip(selected_texts, idxs_to_extract)]
@@ -275,13 +268,12 @@ if __name__ == "__main__":
     distiller = MiniCorpusDistiller(config)
     distiller.build_minicorpus()
 
-# tmux new -s mini_1
+# tmux new -s mini_3
 # conda activate minipile
-# (pip install jsonlines)
-# python 03_distill_pile_embed_idea_1_proportionate.py
+# python 03_distill_pile_embed_idea_3_density.py
 # Detach from tmux session: Ctrl-b followed by d
-# Reattach to tmux session: tmux attach -t mini_1
+# Reattach to tmux session: tmux attach -t mini_3
 # tmux list-sessions
-# tmux kill-session -t mini_1
+# tmux kill-session -t mini_3
 #
-# Took ~5 hours.
+#
