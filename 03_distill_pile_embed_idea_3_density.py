@@ -230,6 +230,7 @@ class MiniCorpusDistiller:
         self.writer.finalize()
 
     def _read_fast_parquet(self, file_path: str, idxs: List[int]) -> np.ndarray:
+        # This is really fast, really memory-optimized, but craps all over the cache; I can't control that.
         parquet = ParquetFile(file_path) # https://github.com/dask/fastparquet/issues/386
         result = parquet.to_pandas(columns=['text'])['text'].to_numpy()[idxs]
         del parquet
@@ -276,4 +277,4 @@ if __name__ == "__main__":
 # tmux list-sessions
 # tmux kill-session -t mini_3
 #
-#
+# Took ~3 hours.
