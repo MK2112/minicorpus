@@ -38,7 +38,7 @@ class LossiConfig:
     base_dir: Path = Path("/vol/tmp/koppelmm")
     cluster_dir: Path = base_dir / "MiniPile_BatchKMeans/clustering_sorted"
     cluster_info_path: Path = base_dir / "MiniPile_BatchKMeans/clustering_results/cluster_info_for_inspection.json"
-    edition: str = "Lossi"
+    edition: str = "Lossi_1"
     embd_dir: Path = base_dir / "Pile_Deduplicated_Embd"
     output_loss_path: Path = base_dir / f"MiniPile_{edition}/cluster_loss.jsonl"
     proxy_model_path: Path = base_dir / "pythia70m_dedup_pile_half"
