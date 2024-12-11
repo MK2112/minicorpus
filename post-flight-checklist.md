@@ -8,3 +8,4 @@
 - Check all HuggingFace links for if they still exist (have been renamed)
 - Check if the explained ideas in 03 align with the order of the realized idea scripts
 - Nuke all remaining tmux sessions
+- export and add to repo: conda env setup
