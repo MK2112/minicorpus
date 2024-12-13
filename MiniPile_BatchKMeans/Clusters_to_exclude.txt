@@ -1,0 +1,8 @@
+We exclude 38 out of the 220 clusters.
+The rationales for excluding such clusters are as follows:  
+• Near-duplicate documents will contain repetitions, which have been shown to degrade model performance [33, 21, 1].
+• Pornography may contain sexist spurious correlations and enforce racial/social stereotypes [9, 59].
+• Webpage navigation bars/product specifications/long named entity lists entail long-tail knowledge, which is challenging to learn even for large language models up to 176B parameters [28].
+
+k=220 -> 38 clusters to exclude:
+10, 15, 16, 22, 26, 28, 35, 37, 39, 40, 44, 46, 51, 57, 61, 64, 78, 86, 87, 88, 90, 94, 99, 101, 102, 103, 111, 114, 152, 155, 163, 166, 167, 181, 196, 200, 218, 219
