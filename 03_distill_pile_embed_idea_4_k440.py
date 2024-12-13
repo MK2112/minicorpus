@@ -14,8 +14,8 @@ from fastparquet import ParquetFile
 @dataclass
 class DistillConfig:
     base_dir: Path = Path("/vol/tmp/koppelmm")
-    cluster_dir: Path = base_dir / "MiniPile_BatchKMeans/clustering_sorted"
-    cluster_info_path: Path = base_dir / "MiniPile_BatchKMeans/clustering_results/cluster_info_for_inspection.json"
+    cluster_dir: Path = base_dir / "MiniPile_BatchKMeans_Double/clustering_sorted"
+    cluster_info_path: Path = base_dir / "MiniPile_BatchKMeans_Double/clustering_results/cluster_info_for_inspection.json"
     embd_dir: Path = base_dir / "Pile_Deduplicated_Embd"
     num_clusters: int = 440 # As per paper
     num_clusters_to_exclude: int = 76 # As per paper

@@ -348,4 +348,4 @@ if __name__ == "__main__":
 # tmux kill-session -t cluster_pile
 # I tested for index and restart consistency. Nominal.
 #
-# This took roughly 27 hours.
+# This took roughly 30 + 37 hours to complete.
