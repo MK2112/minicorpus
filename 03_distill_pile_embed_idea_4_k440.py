@@ -18,7 +18,7 @@ class DistillConfig:
     cluster_info_path: Path = base_dir / "MiniPile_BatchKMeans_Double/clustering_results/cluster_info_for_inspection.json"
     embd_dir: Path = base_dir / "Pile_Deduplicated_Embd"
     num_clusters: int = 440 # As per paper
-    num_clusters_to_exclude: int = 76 # As per paper
+    num_clusters_to_exclude: int = 70 # As per paper
     edition: str = "k440" # Version of MiniPile, distinguishes file naming + output directory
     # TODO: Find the 76 excludable cluster' indices
     #
@@ -94,8 +94,8 @@ class MiniCorpusDistiller:
     def __init__(self, config: DistillConfig):
         self.config = config
         # Validate configuration parameters for cluster exclusion
-        if len(self.config.excluded_clusters) != self.config.num_clusters_to_exclude:
-            raise ValueError(f"Must exclude exactly {self.config.num_clusters_to_exclude} clusters to adhere to the paper. You provided {len(self.config.excluded_clusters)} clusters.")
+        if len(self.config.excluded_clusters) <= self.config.num_clusters_to_exclude:
+            raise ValueError(f"Must exclude {self.config.num_clusters_to_exclude} clusters. You provided {len(self.config.excluded_clusters)} clusters.")
         self._load_total_cluster_info()
         self._compute_shard_scopes()
         self.shard_counter: int = 0
