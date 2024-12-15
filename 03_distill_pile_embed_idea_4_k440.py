@@ -19,16 +19,19 @@ class DistillConfig:
     embd_dir: Path = base_dir / "Pile_Deduplicated_Embd"
     num_clusters: int = 440 # As per paper
     num_clusters_to_exclude: int = 70 # As per paper
-    edition: str = "k440" # Version of MiniPile, distinguishes file naming + output directory
+    edition: str = "k440_fixed" # Version of MiniPile, distinguishes file naming + output directory
     # TODO: Find the 76 excludable cluster' indices
     #
     #
-    excluded_clusters: Set[int] = field(default_factory=lambda: { })
+    excluded_clusters: Set[int] = field(default_factory=lambda: {3, 6, 7, 8, 9, 19, 20, 24, 26, 32, 39, 46, 47, 48, 49, 50, 51, 54, 57, 60, 69,
+                                                                 85, 89, 91, 92, 106, 108, 111, 120, 144, 147, 152, 162, 165, 169, 172, 176, 178,
+                                                                 189, 199, 203, 208, 210, 212, 215, 216, 224, 227, 243, 244, 254, 264, 274, 283,
+                                                                 289, 299, 304, 322, 333, 338, 350, 369, 370, 388, 401, 404, 410, 413, 417, 430})
     #
     #
     train_count: int = 1_000_000
     val_count: int = 500
-    test_count: int = 10_000 # 1M/500/10k Train/Val/Test total
+    test_count: int = 12_663 # 1M/500/10k Train/Val/Test total (I don't now why exactly, but nudging test +2,663 makes it 1M/500/10k in the end)
     examples_per_cluster: int = (train_count + val_count + test_count) // (num_clusters - num_clusters_to_exclude)
     extra_examples: int = (train_count + val_count + test_count) % (num_clusters - num_clusters_to_exclude)
     output_shard_size: int = 100_000
@@ -94,14 +97,14 @@ class MiniCorpusDistiller:
     def __init__(self, config: DistillConfig):
         self.config = config
         # Validate configuration parameters for cluster exclusion
-        if len(self.config.excluded_clusters) <= self.config.num_clusters_to_exclude:
+        if len(self.config.excluded_clusters) != self.config.num_clusters_to_exclude:
             raise ValueError(f"Must exclude {self.config.num_clusters_to_exclude} clusters. You provided {len(self.config.excluded_clusters)} clusters.")
         self._load_total_cluster_info()
         self._compute_shard_scopes()
         self.shard_counter: int = 0
         self.writer = MiniCorpusWriter(output_dir=config.output_dir,
-                                     edition=config.edition,
-                                     output_shard_size=config.output_shard_size)
+                                       edition=config.edition,
+                                       output_shard_size=config.output_shard_size)
     
     def _load_total_cluster_info(self):
         # Load general cluster information JSON file, populate class attribute
@@ -262,13 +265,13 @@ if __name__ == "__main__":
     distiller = MiniCorpusDistiller(config)
     distiller.build_minicorpus()
 
-# tmux new -s minipile
+# tmux new -s mini_k440
 # conda activate minipile
 # (pip install jsonlines)
-# python 03_distill_pile_embed.py
+# python 03_distill_pile_embed_idea_4_k440.py
 # Detach from tmux session: Ctrl-b followed by d
-# Reattach to tmux session: tmux attach -t minipile
+# Reattach to tmux session: tmux attach -t mini_k440
 # tmux list-sessions
-# tmux kill-session -t minipile
+# tmux kill-session -t mini_k440
 #
 # 
