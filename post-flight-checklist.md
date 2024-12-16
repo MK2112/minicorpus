@@ -13,3 +13,4 @@ Fix these naming inconsistencies:
 - Nuke all remaining tmux sessions
 - Make it more clear that *zero-shot* performance is reported with the benchmarks throughout
 - export and add to repo: conda env setup
+- Update Repo README
