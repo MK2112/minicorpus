@@ -1,0 +1,4 @@
+| Tasks  |Version|Filter|n-shot| Metric |   |Value |   |Stderr|
+|--------|------:|------|-----:|--------|---|-----:|---|-----:|
+|arc_easy|      1|none  |     0|acc     |↑  |0.6174|±  |0.0100|
+|        |       |none  |     0|acc_norm|↑  |0.5682|±  |0.0102|
