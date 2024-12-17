@@ -1,5 +1,4 @@
 import torch
-import torch
 from pathlib import Path
 from lm_eval import utils, simple_evaluate
 from lm_eval.models.huggingface import HFLM
@@ -8,7 +7,7 @@ from transformers import AutoModelForCausalLM, AutoTokenizer
 base_dir = "/vol/tmp/koppelmm"
 base_path = Path(base_dir)
 
-## Evaluation - Pythia 1.4B on still missing benchmarks
+## Evaluation - Pythia 1.4B
 
 device = "cuda" if torch.cuda.is_available() else "cpu"
 pythia_pile = AutoModelForCausalLM.from_pretrained(base_path / "pythia1.4b_dedup_pile", local_files_only=True)
@@ -22,26 +21,26 @@ pythia_minipile_hflm = HFLM(pretrained=pythia_pile,
                         batch_size=batch_size_hflm)
 
 results = simple_evaluate(model=pythia_minipile_hflm,
-                          tasks=["mmlu", "hellaswag", "lambada", "blimp"],
+                          tasks=["arc_challenge", "mmlu", "winogrande", "hellaswag", "lambada", "blimp", "arc_easy"],
                           num_fewshot=0,
                           batch_size=batch_size_hflm,
                           device="cuda",
                           limit=None)
 
-with open('03_eval_1.4B_pile-dedup.txt', 'w') as f:
+with open('03_eval_1.4B_dedup_pile_easy.txt', 'w') as f:
     f.write(str(results))
 
 # Make the table and save it too
 table = utils.make_table(results)
 print(table)
-with open('03_eval_1.4B_pile-dedup_table.txt', 'w') as f:
+with open('03_eval_1.4B_dedup_pile_table_easy.txt', 'w') as f:
     f.write(table)
 
 # tmux new -s bench_14B
 # tmux attach -t bench_14B
 # conda activate minipile
 # 
-# CUDA_VISIBLE_DEVICES=2 python 03_bench_1.4B_pretrained.py
+# CUDA_VISIBLE_DEVICES=2 python 03_bench_1.4B.py
 #  
 # Detach from tmux session: Ctrl-b followed by d
 # Reattach to tmux session: tmux attach -t bench_14B
