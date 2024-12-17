@@ -269,7 +269,7 @@ if __name__ == "__main__":
 
 # tmux new -s mini_2
 # conda activate minipile
-# python 03_distill_pile_embed_idea_2.1_lossi_2.py
+# python 03_distill_pile_embed_idea_2_lossi_2.py
 # Detach from tmux session: Ctrl-b followed by d
 # Reattach to tmux session: tmux attach -t mini_2
 # tmux list-sessions

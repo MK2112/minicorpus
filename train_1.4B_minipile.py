@@ -255,7 +255,7 @@ def bench():
         f.write(table)
 
 def push_model():
-    api = HfApi(token="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") # This is a temporary account, just for these scripts
+    api = HfApi(token="xyz") # This is a temporary account, just for these scripts
     local_path = str(base_path / output_folder)
     hf_repo_id = "Marcus1221/pythia-1.4b-minipile" # This is a temporary account, just for these scripts
     print(f"Pushing model to {hf_repo_id}")
