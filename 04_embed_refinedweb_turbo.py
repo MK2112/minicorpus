@@ -231,13 +231,13 @@ if __name__ == "__main__":
     pipeline = EmbeddingPipeline(config)
     pipeline.run()
 
-# tmux new -s embed_pile
+# tmux new -s embed_rw
 # conda activate minipile
-# accelerate launch --mixed_precision fp16 --num_processes=1 03_embed_pile_dedup_turbo.py
+# accelerate launch --mixed_precision fp16 --num_processes=1 04_embed_refinedweb_turbo.py
 # You can run this as multi-card process, but ... that won't do anything. Only one process persists.
 # Detach from tmux session: Ctrl-B followed by D
-# Reattach to tmux session: tmux attach -t embed_pile
+# Reattach to tmux session: tmux attach -t embed_rw
 # tmux list-sessions
-# tmux kill-session -t embed_pile
+# tmux kill-session -t embed_rw
 #
-# This took roughly 170 hours.
+# 
