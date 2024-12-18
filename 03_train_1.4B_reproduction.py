@@ -1,6 +1,3 @@
-# Adapted from 02_eval_160M.ipynb
-# Training script for Distributed Training of Pythia 1.4B on MiniPile Recreation
-
 import os
 import torch
 import numpy as np
@@ -12,6 +9,8 @@ from huggingface_hub import snapshot_download
 from torch.optim.lr_scheduler import _LRScheduler
 from transformers import DataCollatorForLanguageModeling
 from transformers import AutoModelForCausalLM, AutoTokenizer, Trainer, TrainingArguments, get_cosine_schedule_with_warmup
+
+# Training script for Distributed Training of Pythia 1.4B on MiniPile Reproduction
 
 base_dir = "/vol/tmp/koppelmm"
 base_path = Path(base_dir)
@@ -165,10 +164,7 @@ def training():
         dataloader_num_workers=4,
         dataloader_pin_memory=True,
     )
-
-    # Enable gradient checkpointing
     
-
     # Ensure training across multiple GPUs if available
     device = "cuda" if torch.cuda.is_available() else "cpu"
     empty_model = empty_model.to(device)
@@ -200,11 +196,11 @@ if __name__ == "__main__":
     training()
     torch.cuda.empty_cache()
 
-# tmux new -s 14b_minipile_recreation
+# tmux new -s 14b_minipile_reproduction
 # conda activate minipile
-# torchrun --nproc_per_node=4 03_train_1.4B_recreation.py
-# I ran with CUDA_VISIBLE_DEVICES=0,1,2 torchrun --nproc_per_node=3 03_train_1.4B_recreation.py
+# torchrun --nproc_per_node=4 03_train_1.4B_reproduction.py
+# I ran with CUDA_VISIBLE_DEVICES=0,1,2 torchrun --nproc_per_node=3 03_train_1.4B_reproduction.py
 # Detach from tmux session: Ctrl-b followed by d
-# Reattach to tmux session: tmux attach -t 14b_minipile_recreation
+# Reattach to tmux session: tmux attach -t 14b_minipile_reproduction
 # tmux list-sessions
-# tmux kill-session -t 14b_minipile_recreation
+# tmux kill-session -t 14b_minipile_reproduction

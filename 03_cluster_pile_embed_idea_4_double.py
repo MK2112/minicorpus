@@ -1,14 +1,14 @@
+import gc
 import json
 import time
-import gc
 import numpy as np
 from tqdm import tqdm
+from pathlib import Path
+from typing import Dict, Any
+from datasets import load_dataset
+from collections import defaultdict
 from sklearn.cluster import MiniBatchKMeans
 from sklearn.metrics.pairwise import cosine_distances
-from datasets import load_dataset
-from pathlib import Path
-from collections import defaultdict
-from typing import Dict, Any
 
 base_path = Path("/vol/tmp/koppelmm")
 embd_dir = base_path / "Pile_Deduplicated_Embd" # This is where the embeddings are stored/written to (create "End_Here.txt" here to signal end)
@@ -20,6 +20,7 @@ batch_size = 16384  # As per paper
 n_init = 3          # Default, nothing else is specified
 
 class CosineMiniBatchKMeans(MiniBatchKMeans):
+    # Wrapper for a normal MiniBatchKMeans to use (really enforce) cosine distance
     # Stupidly many parameters, but necessary (https://scikit-learn.org/stable/modules/generated/sklearn.cluster.MiniBatchKMeans.html)
     def __init__(self, n_clusters=8, *, init='k-means++', max_iter=100, batch_size=1024, 
                  verbose=0, compute_labels=True, random_state=None, tol=0.0, 
@@ -33,13 +34,12 @@ class CosineMiniBatchKMeans(MiniBatchKMeans):
         self._n_threads = 32
 
     def _transform(self, X):
-        # Prob most lowkey way to enforce using cosine distance
         return cosine_distances(X, self.cluster_centers_)
 
     def _mini_batch_step(self, X, sample_weight, x_squared_norms, random_reassign=False, n_threads=32):
         # Plainly call original method for batch processing
         super()._mini_batch_step(X, sample_weight, x_squared_norms, random_reassign, n_threads)
-        # Normalize the centroids, remain on unit hypersphere for interpretability
+        # Normalize the centroids
         self.cluster_centers_ = self.cluster_centers_ / np.linalg.norm(self.cluster_centers_, axis=1, keepdims=True)
 
 batchified_kmeans = CosineMiniBatchKMeans(n_clusters=k_clusters, batch_size=batch_size, init='k-means++', n_init=n_init, random_state=42)
@@ -280,10 +280,10 @@ def finalize_clustering():
                     cluster = int(label)
                     cluster_info_temp[cluster]['total_examples'] += 1
                     cluster_info_temp[cluster]['sum_distance'] += distance
-                    text_trunc = text[:256] if len(text) > 256 else text # no need for fulltext, this is enough
+                    text_trunc = text[:256] if len(text) > 256 else text # no need for fulltext, this is enough for me
                     cluster_info_temp[cluster]['closest'].append({'text': text_trunc, 'distance': distance})
                     cluster_info_temp[cluster]['farthest'].append({'text': text_trunc, 'distance': distance})
-                    # Makes me sad to call myself a student but blows up memory otherwise and heapq is a nightmare
+                    # Makes me sad but blows up memory otherwise and heapq is a nightmare
                     if len(cluster_info_temp[cluster]['closest']) > 8:
                         cluster_info_temp[cluster]['closest'] = sorted(cluster_info_temp[cluster]['closest'], key=lambda x: x['distance'])[:5]
                         cluster_info_temp[cluster]['farthest'] = sorted(cluster_info_temp[cluster]['farthest'], key=lambda x: x['distance'], reverse=True)[:5]

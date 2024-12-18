@@ -7,7 +7,8 @@ from transformers import AutoModelForCausalLM, AutoTokenizer
 base_dir = "/vol/tmp/koppelmm"
 base_path = Path(base_dir)
 
-## Evaluation - Pythia 1.4B
+# Benchmark Script for Pythia 1.4B models
+# using the EleutherAI LM-Eval Harness
 
 device = "cuda" if torch.cuda.is_available() else "cpu"
 pythia_pile = AutoModelForCausalLM.from_pretrained(base_path / "pythia1.4b_dedup_pile", local_files_only=True)
@@ -22,7 +23,7 @@ pythia_minipile_hflm = HFLM(pretrained=pythia_pile,
 
 results = simple_evaluate(model=pythia_minipile_hflm,
                           tasks=["arc_challenge", "mmlu", "winogrande", "hellaswag", "lambada", "blimp", "arc_easy"],
-                          num_fewshot=0,
+                          num_fewshot=0, # zero-shot
                           batch_size=batch_size_hflm,
                           device="cuda",
                           limit=None)

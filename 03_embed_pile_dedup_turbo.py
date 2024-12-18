@@ -1,29 +1,28 @@
 import os
 import gc
 import torch
+import queue
+import threading
 import numpy as np
+import pyarrow as pa
+import pyarrow.parquet as pq
+import torch.nn.functional as F
 from tqdm import tqdm
 from pathlib import Path
 from typing import Dict, List
 from dataclasses import dataclass
 from accelerate import Accelerator
+from torch.utils.data import DataLoader
 from datasets import load_dataset, Dataset
 from huggingface_hub import snapshot_download
-from torch.utils.data import DataLoader
-import queue
-import threading
-import pyarrow as pa
-import pyarrow.parquet as pq
-import torch.nn.functional as F
-from torch import Tensor
 from transformers import AutoTokenizer, AutoModel
 
 @dataclass
 class Config:
     base_dir: str = "/vol/tmp/koppelmm"
-    tokenization_batch_size: int = 128    # That's the max on 4x A6000
+    tokenization_batch_size: int = 128 # That's the max on 4x A6000
     prefetch_batches: int = 2
-    embedding_dim: int = 768              # Doesn't do anything, but signals use of e5-base-4k
+    embedding_dim: int = 768  # Doesn't do anything, but signals use of e5-base-4k
     shard_size: int = tokenization_batch_size * 4096  # Embeddings per shard (shards 0-51, inclusive)
     num_worker_threads: int = 4
     max_length: int = 1024  # Contained at 1024 for better depth than e5-large but better speed than 4k
@@ -127,16 +126,16 @@ class EmbeddingPipeline:
             # If we test in some other dir, we just run with the standard shard size
             skip_items_count = (len(list(self.embd_dir.glob("shard_*.parquet"))) * self.config.shard_size)
         dataset = load_dataset("parquet",
-                            data_files={"train": str(self.base_path / "Pile_Deduplicated" / "data" / "train-*.parquet")},
-                            cache_dir=None,
-                            split="train",
-                            streaming=True)
+                               data_files={"train": str(self.base_path / "Pile_Deduplicated" / "data" / "train-*.parquet")},
+                               cache_dir=None,
+                               split="train",
+                               streaming=True)
         if self.accelerator.is_main_process:
             print(f"Skipping {skip_items_count} items. This may take a while...")
         dataset = dataset.skip(skip_items_count)
         return dataset 
     
-    def average_pool(self, last_hidden_states: Tensor, attention_mask: Tensor) -> Tensor:
+    def average_pool(self, last_hidden_states: torch.Tensor, attention_mask: torch.Tensor) -> torch.Tensor:
         attention_mask = attention_mask.to(last_hidden_states.device)
         last_hidden = last_hidden_states.masked_fill(~attention_mask[..., None].bool(), 0.0)
         return last_hidden.sum(dim=1) / attention_mask.sum(dim=1)[..., None]

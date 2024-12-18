@@ -1,15 +1,15 @@
 import gc
 import json
-import numpy as np
 import jsonlines
+import numpy as np
 import pyarrow as pa
 import pyarrow.parquet as pq
 from tqdm import tqdm
 from pathlib import Path
-from dataclasses import dataclass, field
 from typing import Set, Dict, List
-from multiprocessing import Pool, cpu_count
 from fastparquet import ParquetFile
+from dataclasses import dataclass, field
+from multiprocessing import Pool, cpu_count
 
 @dataclass
 class DistillConfig:
@@ -35,7 +35,6 @@ class DistillConfig:
     rng: np.random.Generator = np.random.default_rng(42) # reproducibility
 
     def __post_init__(self):
-        # Just nicer and more distinct to place here
         self.output_dir = self.base_dir / f"MiniPile_{self.edition}"
         self.output_dir.mkdir(exist_ok=True, parents=True)
         # Not used here, but needed later to not hit disk quotas

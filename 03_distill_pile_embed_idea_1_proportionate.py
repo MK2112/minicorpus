@@ -1,23 +1,23 @@
 import gc
 import json
-import numpy as np
 import jsonlines
+import numpy as np
 import pyarrow as pa
 import pyarrow.parquet as pq
 from tqdm import tqdm
 from pathlib import Path
-from dataclasses import dataclass, field
-from typing import Set, Dict, List
-from multiprocessing import Pool, cpu_count
 from functools import lru_cache
+from typing import Set, Dict, List
+from dataclasses import dataclass, field
+from multiprocessing import Pool, cpu_count
 
 ## Idea 1:
-#   During assembly of the original distillation script, I realized that the dataset consists of differently sized clusters.
-#   However, and the benchmarks seem to confirm that, the methodology actually samples equal amounts of examples from each non-excluded cluster.
-#   At worst, this can lead to introduction of bias, at best, it's a missed opportunity to make the dataset more or representative of its source.
-#   I therefore propose to sample examples from each cluster proportionally to its size, in hopes of making the dataset more representative.
-#   I expect benchmarks of the original (recreation) and the proportional (proportioned) sampling to show that the proportional sampling is more representative."
-#   This pretty much lifts the fixed-size constraint, but we'll use it for an upper bound on the dataset size.
+#   The dataset consists of differently sized clusters.
+#   However, the paper methodology actually samples equal amounts of examples from each non-excluded cluster.
+#   At worst, this can lead to introduction of bias, at best, it's 'just' a missed opportunity to make the dataset more 
+#   representative of its source. I therefore propose to sample examples from each cluster proportionally to its size,
+#   in hopes of making the dataset more representative. I expect benchmarks of the original (recreation) and the
+#   proportional (proportioned) sampling to show that the proportional sampling is more representative.
 
 @dataclass
 class DistillConfig:
@@ -45,17 +45,17 @@ class DistillConfig:
         # Just nicer and more distinct to place here
         self.output_dir = self.base_dir / f"MiniPile_{self.edition}"
         self.output_dir.mkdir(exist_ok=True, parents=True)
-        # Not used here, but needed later to not hit disk quotas
+        # Needed to not hit disk quotas later on
         self.cache_dir = self.base_dir / f"MiniPile_{self.edition}_Cache"
         self.cache_dir.mkdir(exist_ok=True, parents=True)
-        # I kicked out the 'extra_examples' part, because it's not needed where we're going
+        # I kicked out the 'extra_examples' part
 
 class MiniCorpusWriter:
     def __init__(self, output_dir: Path, edition: str, output_shard_size: int):
         self.output_dir = output_dir
         self.edition = edition
         self.output_shard_size = output_shard_size
-        # Buffers for each split
+        # 'Buffers' for each split
         self.buffers = { split : [] for split in ['train', 'validation', 'test'] }
         # Shard counters for each split
         self.shard_counters = { split : 0 for split in ['train', 'validation', 'test'] }
@@ -87,6 +87,7 @@ class MiniCorpusWriter:
             if self.buffers[split]:
                 self._write_shard(split, force=True)
 
+# This is an outdated implementation, but I kept it for reference
 @lru_cache(maxsize=0)
 def cached_read_parquet(file_path: str) -> np.ndarray:
     # I forced using numpy and was successful thanks to https://arrow.apache.org/docs/python/numpy.html
@@ -103,8 +104,8 @@ class MiniCorpusDistiller:
         self._compute_shard_scopes()
         self.shard_counter: int = 0
         self.writer = MiniCorpusWriter(output_dir=config.output_dir,
-                                     edition=config.edition,
-                                     output_shard_size=config.output_shard_size)
+                                       edition=config.edition,
+                                       output_shard_size=config.output_shard_size)
     
     def _load_total_cluster_info(self):
         # Load general cluster information JSON file, populate class attribute
@@ -113,6 +114,7 @@ class MiniCorpusDistiller:
     
     def _compute_shard_scopes(self):
         # Precompute cumulative entries for efficient document lookup
+        # Serves to boost lookup performance, and is as hacky as it gets
         self.shard_idxs = []
         cumulative_idxs = 0
         num_shards = len(list(Path(self.config.embd_dir).glob("shard_*.parquet")))
@@ -255,6 +257,7 @@ class MiniCorpusDistiller:
         selected_texts = cached_read_parquet(str(file_path))[local_idxs]
         
         # That operation bloats cache like crazy, I had to outsource and clear it, that was hideous
+        # https://stackoverflow.com/questions/37653784/how-do-i-use-cache-clear-on-python-functools-lru-cache
         cached_read_parquet.cache_clear()
         
         # Merging the global indices back in for reference/debugging/fun

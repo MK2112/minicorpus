@@ -5,6 +5,7 @@ Fix these naming inconsistencies:
 - "recreation" -> reproduction (although funny)
 - "proportionate" -> proportioned
 
+- Add a script-by-script guide to distilling MiniPile to the ReadMe
 - Check for the above in all files and in notebook 03 (esp. the tables)
 - Check if all used resources/links are marked/attributed
 - Check all HuggingFace links for if they still exist (have been renamed)

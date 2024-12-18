@@ -35,7 +35,7 @@ class LossiConfig:
     output_loss_path: Path = base_dir / f"MiniPile_{edition}/cluster_loss.jsonl"
     proxy_model_path: Path = base_dir / "pythia70m_dedup_pile_half"
     num_clusters: int = 220
-    doc_length: int = 512
+    doc_length: int = 512 # Maximum document length for the proxy model (same as the original e5-large would have gotten, so this is deemed representative)
     excluded_clusters: Set[int] = field(default_factory=lambda: {10, 15, 16, 22, 26, 28, 35, 37, 39, 40, 44, 46, 
                                                                  51, 57, 61, 64, 78, 86, 87, 88, 90, 94, 99, 101,
                                                                  102, 103, 111, 114, 152, 155, 163, 166, 167, 181,
@@ -115,7 +115,8 @@ class LossiSampler:
         return len(self.shard_idxs) - 1
 
     def _read_fast_parquet(self, file_path: str, idxs: List[int], limit: bool = False) -> np.ndarray:
-        parquet = ParquetFile(file_path)
+        # This is really fast, really memory-optimized, but bloats the cache; I can't control that.
+        parquet = ParquetFile(file_path) # https://github.com/dask/fastparquet/issues/386
         if limit:
             # Limit each string entry from 'text' column to 512 characters
             result = np.vectorize(lambda x: x[:512])(parquet.to_pandas(columns=['text'])['text'].to_numpy()[idxs])
@@ -145,6 +146,7 @@ class LossiSampler:
 
     def _compute_shard_scopes(self):
         # Precompute cumulative entries for efficient document lookup
+        # Serves to boost lookup performance, and is as hacky as it gets
         self.shard_idxs = []
         cumulative_idxs = 0
         num_shards = len(list(Path(self.config.embd_dir).glob("shard_*.parquet")))
@@ -193,7 +195,7 @@ class LossiSampler:
             with open(self.config.base_dir / f"MiniPile_{self.config.edition}/sampled_texts_dict.json", "w") as f:
                 json.dump(sampled_texts_dict, f)
         else:
-            print(f"[~] Loading sampled texts from saved file")
+            print("[~] Loading sampled texts from saved file")
             with open(self.config.base_dir / f"MiniPile_{self.config.edition}/sampled_texts_dict.json", "r") as f:
                 sampled_texts_dict = json.load(f)
 

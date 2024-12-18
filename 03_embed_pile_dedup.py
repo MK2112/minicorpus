@@ -1,21 +1,23 @@
 import os
 import torch
+import queue
+import threading
 import numpy as np
+import pyarrow as pa
+import pyarrow.parquet as pq
 from tqdm import tqdm
 from pathlib import Path
 from typing import Dict, List
 from dataclasses import dataclass
 from accelerate import Accelerator
-from functools import partial
+from torch.utils.data import DataLoader
 from datasets import load_dataset, Dataset
 from huggingface_hub import snapshot_download
 from sentence_transformers import SentenceTransformer
-from torch.utils.data import DataLoader
-from concurrent.futures import ThreadPoolExecutor
-import queue
-import threading
-import pyarrow as pa
-import pyarrow.parquet as pq
+
+# Do not use this script. I left it here purely for reference.
+# This is what naivite looks like. The script is slow and inefficient and crashes with OOM.
+# Use the turbo version instead: 03_embed_pile_dedup_turbo.py
 
 @dataclass
 class Config:

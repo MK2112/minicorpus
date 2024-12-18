@@ -118,4 +118,4 @@ if __name__ == "__main__":
 # tmux list-sessions
 # tmux kill-session -t sort_pile
 # 
-# Took roughly 1 minute.
+# Took roughly (hilariously) 1 minute.

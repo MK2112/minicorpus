@@ -1,15 +1,15 @@
 import gc
 import json
-import numpy as np
 import jsonlines
+import numpy as np
 import pyarrow as pa
 import pyarrow.parquet as pq
 from tqdm import tqdm
 from pathlib import Path
-from dataclasses import dataclass, field
 from typing import Set, Dict, List
-from multiprocessing import Pool, cpu_count
 from fastparquet import ParquetFile
+from dataclasses import dataclass, field
+from multiprocessing import Pool, cpu_count
 
 ## Idea 2:
 #   Lossi (Loss-informed Sampling) is a one-shot proxy-based geometric sampling approach that is guided by a loss-based importance heuristic, 
@@ -96,8 +96,8 @@ class MiniCorpusDistiller:
         self._compute_shard_scopes()
         self.shard_counter: int = 0
         self.writer = MiniCorpusWriter(output_dir=config.output_dir,
-                                     edition=config.edition,
-                                     output_shard_size=config.output_shard_size)
+                                       edition=config.edition,
+                                       output_shard_size=config.output_shard_size)
     
     def _load_proportion_info(self):
         # Load cluster proportion information JSONL file, populate class attribute
@@ -111,6 +111,7 @@ class MiniCorpusDistiller:
     
     def _compute_shard_scopes(self):
         # Precompute cumulative entries for efficient document lookup
+        # Serves to boost lookup performance, and is as hacky as it gets
         self.shard_idxs = []
         cumulative_idxs = 0
         num_shards = len(list(Path(self.config.embd_dir).glob("shard_*.parquet")))
@@ -229,7 +230,8 @@ class MiniCorpusDistiller:
         self.writer.finalize()
 
     def _read_fast_parquet(self, file_path: str, idxs: List[int]) -> np.ndarray:
-        parquet = ParquetFile(file_path)
+        # This is really fast, really memory-optimized, but bloats the cache; I can't control that.
+        parquet = ParquetFile(file_path) # https://github.com/dask/fastparquet/issues/386
         result = parquet.to_pandas(columns=['text'])['text'].to_numpy()[idxs]
         del parquet
         return result

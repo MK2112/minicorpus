@@ -1,13 +1,17 @@
 import json
-import numpy as np
-from pathlib import Path
-from typing import Set, Dict, List
-from dataclasses import dataclass
-import pyarrow.parquet as pq
-from tqdm import tqdm
 import queue
 import threading
+import numpy as np
+import pyarrow.parquet as pq
+from tqdm import tqdm
+from pathlib import Path
+from dataclasses import dataclass
+from typing import Set, Dict, List
 from collections import defaultdict
+
+# This doesn't work and it was left here solely for reference. This established a lot of the structure that I used for the actual implementation.
+# I tinkered with this masking step idea for a while, ultimately trying to find a most appropriate way to distill the MiniPile dataset.
+# I moved on to build the working 03_distill_pile_embed.py
 
 @dataclass
 class FilterConfig:
@@ -200,7 +204,7 @@ if __name__ == "__main__":
     
     print("\n[!] MiniPile mask created")
 
-# Run this to create the amsk for MiniPile
+# Run this to create the mask for MiniPile
 # This doesn't copy or move data or anything, it just creates the mask and metadata
 # To make this have an effect and to effectively 'cut-out' the MiniPile dataset, use something like this (just a general idea, not a working example, I'm tired):
 

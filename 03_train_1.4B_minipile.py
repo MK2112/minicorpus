@@ -1,6 +1,3 @@
-# Adapted from 02_eval_160M.ipynb
-# Training script for Distributed Training of Pythia 1.4B on MiniPile Recreation
-
 import os
 import torch
 import numpy as np
@@ -12,6 +9,8 @@ from huggingface_hub import snapshot_download
 from torch.optim.lr_scheduler import _LRScheduler
 from transformers import DataCollatorForLanguageModeling
 from transformers import AutoModelForCausalLM, AutoTokenizer, Trainer, TrainingArguments, get_cosine_schedule_with_warmup
+
+# Training script for Distributed Training of Pythia 1.4B on the original MiniPile
 
 base_dir = "/vol/tmp/koppelmm"
 base_path = Path(base_dir)

@@ -1,15 +1,15 @@
 import gc
 import json
-import numpy as np
 import jsonlines
+import numpy as np
 import pyarrow as pa
 import pyarrow.parquet as pq
 from tqdm import tqdm
 from pathlib import Path
-from dataclasses import dataclass, field
 from typing import Set, Dict, List
-from multiprocessing import Pool, cpu_count
 from fastparquet import ParquetFile
+from dataclasses import dataclass, field
+from multiprocessing import Pool, cpu_count
 
 @dataclass
 class DistillConfig:
@@ -263,7 +263,7 @@ class MiniCorpusDistiller:
         self.writer.finalize()
 
     def _read_fast_parquet(self, file_path: str, idxs: List[int]) -> np.ndarray:
-        # This is really fast, really memory-optimized, but craps all over the cache; I can't control that.
+        # This is really fast, really memory-optimized, but bloats the cache; I can't control that.
         parquet = ParquetFile(file_path) # https://github.com/dask/fastparquet/issues/386
         result = parquet.to_pandas(columns=['text'])['text'].to_numpy()[idxs]
         del parquet

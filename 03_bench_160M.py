@@ -4,6 +4,9 @@ from lm_eval import utils, simple_evaluate
 from lm_eval.models.huggingface import HFLM
 from transformers import AutoModelForCausalLM, AutoTokenizer
 
+# Benchmark Script for Pythia 160M models
+# using the EleutherAI LM-Eval Harness
+
 base_dir = "/vol/tmp/koppelmm"
 base_path = Path(base_dir)
 
@@ -20,7 +23,7 @@ pythia_minipile_hflm = HFLM(pretrained=pythia_minipile,
 
 results = simple_evaluate(model=pythia_minipile_hflm,
                           tasks=["arc_challenge", "mmlu", "winogrande", "hellaswag", "lambada", "blimp"],
-                          num_fewshot=0,
+                          num_fewshot=0, # zero-shot
                           batch_size=batch_size_hflm,
                           device="cuda",
                           limit=None)
