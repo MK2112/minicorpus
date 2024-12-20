@@ -16,7 +16,7 @@ from multiprocessing import Pool, cpu_count
 #   However, the paper methodology actually samples equal amounts of examples from each non-excluded cluster.
 #   At worst, this can lead to introduction of bias, at best, it's 'just' a missed opportunity to make the dataset more 
 #   representative of its source. I therefore propose to sample examples from each cluster proportionally to its size,
-#   in hopes of making the dataset more representative. I expect benchmarks of the original (recreation) and the
+#   in hopes of making the dataset more representative. I expect benchmarks of the original (reproduction) and the
 #   proportional (proportioned) sampling to show that the proportional sampling is more representative.
 
 @dataclass
