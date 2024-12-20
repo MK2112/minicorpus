@@ -341,7 +341,7 @@ if __name__ == "__main__":
 
 # tmux new -s cluster_pile_double
 # conda activate minipile
-# python 03_cluster_pile_embed.py
+# python 04_cluster_pile_embed_idea_4_double.py
 # Detach from tmux session: Ctrl-b followed by d
 # Reattach to tmux session: tmux attach -t cluster_pile
 # tmux list-sessions

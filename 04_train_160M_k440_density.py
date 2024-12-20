@@ -10,7 +10,7 @@ from torch.optim.lr_scheduler import _LRScheduler
 from transformers import DataCollatorForLanguageModeling
 from transformers import AutoModelForCausalLM, AutoTokenizer, Trainer, TrainingArguments, get_cosine_schedule_with_warmup
 
-# Training script for Distributed Training of Pythia 160M on MiniPile Lossi
+# Training script for Distributed Training of Pythia 160M on MiniPile k440 Density
 
 base_dir = "/vol/tmp/koppelmm"
 base_path = Path(base_dir)
@@ -70,16 +70,16 @@ def training():
 
     minipile_train = load_dataset("parquet",
                                   data_files={
-                                      "train": str(base_path / "MiniPile_Lossi_1" / "minipile_Lossi_1_train_shard_*.parquet"),
+                                      "train": str(base_path / "MiniPile_k440Density" / "minipile_k440Density_train_shard_*.parquet"),
                                   },
-                                  cache_dir=str(base_path / "MiniPile_Lossi_1_Cache"),
+                                  cache_dir=str(base_path / "MiniPile_k440Density_Cache"),
                                   split="train")
 
     minipile_val = load_dataset("parquet",
                                 data_files={
-                                    "validation": str(base_path / "MiniPile_Lossi_1" / "minipile_Lossi_1_validation_shard_*.parquet"),
+                                    "validation": str(base_path / "MiniPile_k440Density" / "minipile_k440Density_validation_shard_*.parquet"),
                                 },
-                                cache_dir=str(base_path / "MiniPile_Lossi_1_Cache"),
+                                cache_dir=str(base_path / "MiniPile_k440Density_Cache"),
                                 split="validation")
 
     tokenizer = AutoTokenizer.from_pretrained(base_path / "pythia160m_dedup_untrained", use_fast=True, local_files_only=True)
@@ -97,14 +97,14 @@ def training():
                          max_length=2048,
                          return_special_tokens_mask=True)
 
-    if os.path.exists(base_path / "minipile_Lossi_1_train_tokenized"):
-        minipile_train_tokenized = load_dataset("arrow", data_files=str(base_path / "minipile_Lossi_1_train_tokenized/*.arrow"), split="train")
-        minipile_val_tokenized = load_dataset("arrow", data_files=str(base_path / "minipile_Lossi_1_val_tokenized/*.arrow"), split="train")
+    if os.path.exists(base_path / "minipile_k440Density_train_tokenized"):
+        minipile_train_tokenized = load_dataset("arrow", data_files=str(base_path / "minipile_k440Density_train_tokenized/*.arrow"), split="train")
+        minipile_val_tokenized = load_dataset("arrow", data_files=str(base_path / "minipile_k440Density_val_tokenized/*.arrow"), split="train")
     else:
         minipile_train_tokenized = minipile_train.map(tokenize, batched=True, remove_columns=minipile_train.column_names) # retain only new fields from tokenization
         minipile_val_tokenized = minipile_val.map(tokenize, batched=True, remove_columns=minipile_val.column_names)
-        minipile_train_tokenized.save_to_disk(base_path / "minipile_Lossi_1_train_tokenized")
-        minipile_val_tokenized.save_to_disk(base_path / "minipile_Lossi_1_val_tokenized")
+        minipile_train_tokenized.save_to_disk(base_path / "minipile_k440Density_train_tokenized")
+        minipile_val_tokenized.save_to_disk(base_path / "minipile_k440Density_val_tokenized")
 
     batch_size = 8     # 16 is too much for 4xA6000
     total_batch = 1024
@@ -133,8 +133,8 @@ def training():
     else:
         print("No CUDA-capable GPUs available")
 
-    output_dir = str(base_path / "pythia160m_minipile_Lossi_1_trained")
-    log_dir = str(base_path / "160m_minipile_Lossi_1_logs")
+    output_dir = str(base_path / "pythia160m_minipile_k440Density_trained")
+    log_dir = str(base_path / "160m_minipile_k440Density_logs")
     os.makedirs(output_dir, exist_ok=True)
     os.makedirs(log_dir, exist_ok=True)
 
@@ -189,19 +189,18 @@ def training():
     trainer.train()
 
     # Why is this a two-step process?!
-    trainer.save_model(str(base_path / "pythia160m_minipile_Lossi_1_trained")) # This saves the model weights
+    trainer.save_model(str(base_path / "pythia160m_minipile_k440Density_trained")) # This saves the model weights
 
 if __name__ == "__main__":
+    torch.cuda.empty_cache()
     training()
 
-# tmux new -s 160m_minipile_lossi_1
+# tmux new -s 160m_minipile_k440_density
 # conda activate minipile
-# torchrun --nproc_per_node=4 03_train_160M_lossi_1.py
-# I ran with CUDA_VISIBLE_DEVICES=1,2,3 torchrun --nproc_per_node=3 03_train_160M_lossi_1.py
-# May need to reset in later run, I don't know
+# I ran with CUDA_VISIBLE_DEVICES=1 torchrun --nproc_per_node=1 04_train_160M_k440_density.py
 # Detach from tmux session: Ctrl-b followed by d
-# Reattach to tmux session: tmux attach -t 160m_minipile_lossi_1
+# Reattach to tmux session: tmux attach -t 160m_minipile_k440_density
 # tmux list-sessions
-# tmux kill-session -t 160m_minipile_lossi_1
+# tmux kill-session -t 160m_minipile_k440_density
 #
-# This took 15:23:49 h on 3x A6000
+# 

@@ -10,7 +10,7 @@ from torch.optim.lr_scheduler import _LRScheduler
 from transformers import DataCollatorForLanguageModeling
 from transformers import AutoModelForCausalLM, AutoTokenizer, Trainer, TrainingArguments, get_cosine_schedule_with_warmup
 
-# Training script for Distributed Training of Pythia 160M on MiniPile Density
+# Training script for Distributed Training of Pythia 1.4B on MiniPile Density
 
 base_dir = "/vol/tmp/koppelmm"
 base_path = Path(base_dir)
@@ -18,7 +18,7 @@ base_path = Path(base_dir)
 class CosineSchedulerWithMinLR(_LRScheduler):
     # Basically wrapping the get_cosing_schedule_with_warmup in a lower-bound setting
     # Allows for Cosine Scheduling with a min_lr enforced
-    def __init__(self, optimizer, num_warmup_steps, num_training_steps, min_lr=6e-5):
+    def __init__(self, optimizer, num_warmup_steps, num_training_steps, min_lr):
         self.min_lr = min_lr
         self.base_scheduler = get_cosine_schedule_with_warmup(
             optimizer=optimizer,
@@ -60,13 +60,13 @@ def download_model(down_dir: str, target_folder: str, cache_folder: str, repo_id
             continue
 
 def training():
-    #download_model(down_dir=base_dir, target_folder="pythia160m_dedup_untrained", 
-    #               cache_folder="pythia160m_dedup_untrained_Cache",
-    #               repo_id="EleutherAI/pythia-160m-deduped", branch="step0")
+    #download_model(down_dir=base_dir, target_folder="pythia1.4b_dedup_untrained", 
+    #               cache_folder="pythia1.4b_dedup_untrained_Cache",
+    #               repo_id="EleutherAI/pythia-1.4b-deduped", branch="step0")
 
-    #download_model(down_dir=base_dir, target_folder="pythia160m_dedup_pile", 
-    #               cache_folder="pythia160m_dedup_pile_Cache",
-    #               repo_id="EleutherAI/pythia-160m-deduped", branch="main")
+    #download_model(down_dir=base_dir, target_folder="pythia1.4b_dedup_pile", 
+    #               cache_folder="pythia1.4b_dedup_pile_Cache",
+    #               repo_id="EleutherAI/pythia-1.4b-deduped", branch="main")
 
     minipile_train = load_dataset("parquet",
                                   data_files={
@@ -82,8 +82,8 @@ def training():
                                 cache_dir=str(base_path / "MiniPile_DensityProportioned_Cache"),
                                 split="validation")
 
-    tokenizer = AutoTokenizer.from_pretrained(base_path / "pythia160m_dedup_untrained", use_fast=True, local_files_only=True)
-    empty_model = AutoModelForCausalLM.from_pretrained(base_path / "pythia160m_dedup_untrained", local_files_only=True, low_cpu_mem_usage=True)
+    tokenizer = AutoTokenizer.from_pretrained(base_path / "pythia1.4b_dedup_untrained", use_fast=True, local_files_only=True)
+    empty_model = AutoModelForCausalLM.from_pretrained(base_path / "pythia1.4b_dedup_untrained", local_files_only=True, low_cpu_mem_usage=True)
 
     # Tokenizer doesn't have a pad token, use EOS as a substitute
     if tokenizer.pad_token is None:
@@ -97,6 +97,7 @@ def training():
                          max_length=2048,
                          return_special_tokens_mask=True)
 
+    # I deleted old iterations of this folder before running this script for first time
     if os.path.exists(base_path / "minipile_DensityProportioned_train_tokenized"):
         minipile_train_tokenized = load_dataset("arrow", data_files=str(base_path / "minipile_DensityProportioned_train_tokenized/*.arrow"), split="train")
         minipile_val_tokenized = load_dataset("arrow", data_files=str(base_path / "minipile_DensityProportioned_val_tokenized/*.arrow"), split="train")
@@ -106,7 +107,7 @@ def training():
         minipile_train_tokenized.save_to_disk(base_path / "minipile_DensityProportioned_train_tokenized")
         minipile_val_tokenized.save_to_disk(base_path / "minipile_DensityProportioned_val_tokenized")
 
-    batch_size = 8     # 16 is too much for 4xA6000
+    batch_size = 2 #4 #8 is too much for 3x A100
     total_batch = 1024
 
     # Dynamic padding during training (mlm -> mask language model -> we're doing causal here)
@@ -133,8 +134,8 @@ def training():
     else:
         print("No CUDA-capable GPUs available")
 
-    output_dir = str(base_path / "pythia160m_minipile_DensityProportioned_trained")
-    log_dir = str(base_path / "160m_minipile_DensityProportioned_logs")
+    output_dir = str(base_path / "pythia1.4b_minipile_DensityProportioned_trained")
+    log_dir = str(base_path / "1.4b_minipile_DensityProportioned_logs")
     os.makedirs(output_dir, exist_ok=True)
     os.makedirs(log_dir, exist_ok=True)
 
@@ -146,8 +147,8 @@ def training():
         per_device_train_batch_size=batch_size,   # Gives an effective batch size of 1024 after grad accum
         per_device_eval_batch_size=batch_size,    # Same as training batch size
         gradient_accumulation_steps=(total_batch // batch_size), # Achieve a batch size of 1024
-        learning_rate=6e-4,              # Default Pythia 160M
-        weight_decay=0.01,               # Default Pythia 160M
+        learning_rate=2e-4,              # Default Pythia 1.4B-specific
+        weight_decay=0.01,               # Default Pythia 160M and 1.4B
         max_steps=1024,                  # Adjusted for MiniPile (https://discuss.huggingface.co/t/how-does-max-steps-affect-the-number-of-samples-the-model-sees/69681)
         warmup_steps=int(0.01 * 1024),   # 1% of total steps for warmup
         logging_dir=log_dir,
@@ -159,9 +160,10 @@ def training():
         fp16=True,          # Using mixed precision for comparable conditions
         report_to=None,     # Noting this for later iterations, maybe set this as "wandb", "tensorboard" or smth
         ddp_find_unused_parameters=False, # see https://discuss.pytorch.org/t/how-to-change-ddp-parameter-find-unused-parameters-true-to-false-during-training/130763
-        max_grad_norm=1.0,  # As per Pythia 160M paper
+        max_grad_norm=1.0,  # Default Pythia 160M and 1.4B
         dataloader_num_workers=4,
         dataloader_pin_memory=True,
+        #gradient_checkpointing=True,
     )
 
     # Ensure training across multiple GPUs if available
@@ -174,7 +176,7 @@ def training():
         optimizer=optimizer,
         num_warmup_steps=training_args.warmup_steps,
         num_training_steps=training_args.max_steps,
-        min_lr=6e-5
+        min_lr=2e-5 # Pythia 1.4B-specific
     )
 
     # Train Pythia 160M Untrained on MiniPile
@@ -189,17 +191,18 @@ def training():
     trainer.train()
 
     # Why is this a two-step process?!
-    trainer.save_model(str(base_path / "pythia160m_minipile_DensityProportioned_trained")) # This saves the model weights
+    trainer.save_model(str(base_path / "pythia1.4b_minipile_DensityProportioned_trained")) # This saves the model weights
 
 if __name__ == "__main__":
     training()
 
-# tmux new -s 160m_minipile_density
+# tmux new -s 14b_minipile_density
 # conda activate minipile
-# torchrun --nproc_per_node=4 03_train_160M_density.py
-# I ran with CUDA_VISIBLE_DEVICES=0,2,3 torchrun --nproc_per_node=3 03_train_160M_density.py
-# May need to reset in later run, I don't know
+# torchrun --nproc_per_node=4 04_train_1.4B_density.py
+# I ran with CUDA_VISIBLE_DEVICES=0,1,2 torchrun --nproc_per_node=3 04_train_1.4B_density.py
 # Detach from tmux session: Ctrl-b followed by d
-# Reattach to tmux session: tmux attach -t 160m_minipile_density
+# Reattach to tmux session: tmux attach -t 14b_minipile_density
 # tmux list-sessions
-# tmux kill-session -t 160m_minipile_density
+# tmux kill-session -t 14b_minipile_density
+#
+# 

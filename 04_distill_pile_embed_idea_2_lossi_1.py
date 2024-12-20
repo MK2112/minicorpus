@@ -233,7 +233,7 @@ if __name__ == "__main__":
 # tmux new -s mini_2
 # conda activate minipile
 #
-# CUDA_VISIBLE_DEVICES=2 python 03_distill_pile_embed_idea_2_lossi_1.py
+# CUDA_VISIBLE_DEVICES=2 python 04_distill_pile_embed_idea_2_lossi_1.py
 #  
 # Detach from tmux session: Ctrl-b followed by d
 # Reattach to tmux session: tmux attach -t mini_2

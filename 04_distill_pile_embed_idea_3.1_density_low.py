@@ -14,19 +14,20 @@ from multiprocessing import Pool, cpu_count
 @dataclass
 class DistillConfig:
     base_dir: Path = Path("/vol/tmp/koppelmm")
-    cluster_dir: Path = base_dir / "MiniPile_BatchKMeans_Double/clustering_sorted"
-    cluster_info_path: Path = base_dir / "MiniPile_BatchKMeans_Double/clustering_results/cluster_info_for_inspection.json"
+    cluster_dir: Path = base_dir / "MiniPile_BatchKMeans/clustering_sorted"
+    cluster_info_path: Path = base_dir / "MiniPile_BatchKMeans/clustering_results/cluster_info_for_inspection.json"
     embd_dir: Path = base_dir / "Pile_Deduplicated_Embd"
-    num_clusters: int = 440 # As per paper
-    num_clusters_to_exclude: int = 70 # As per paper
-    edition: str = "k440_fixed" # Version of MiniPile, distinguishes file naming + output directory
-    excluded_clusters: Set[int] = field(default_factory=lambda: {3, 6, 7, 8, 9, 19, 20, 24, 26, 32, 39, 46, 47, 48, 49, 50, 51, 54, 57, 60, 69,
-                                                                 85, 89, 91, 92, 106, 108, 111, 120, 144, 147, 152, 162, 165, 169, 172, 176, 178,
-                                                                 189, 199, 203, 208, 210, 212, 215, 216, 224, 227, 243, 244, 254, 264, 274, 283,
-                                                                 289, 299, 304, 322, 333, 338, 350, 369, 370, 388, 401, 404, 410, 413, 417, 430})
+    num_clusters: int = 220 # As per paper
+    num_clusters_to_exclude: int = 38 # As per paper
+    density_weight: float = 0.75 # Favors sparse clusters when sampling
+    edition: str = "DensityProportionedHigh" # Version of MiniPile, distinguishes file naming + output directory
+    excluded_clusters: Set[int] = field(default_factory=lambda: {10, 15, 16, 22, 26, 28, 35, 37, 39, 40, 44, 46, 
+                                                                 51, 57, 61, 64, 78, 86, 87, 88, 90, 94, 99, 101,
+                                                                 102, 103, 111, 114, 152, 155, 163, 166, 167, 181,
+                                                                 196, 200, 218, 219})
     train_count: int = 1_000_000
     val_count: int = 500
-    test_count: int = 12_663 # 1M/500/10k Train/Val/Test total (I don't now why exactly, but nudging test +2,663 makes it 1M/500/10k in the end)
+    test_count: int = 10_000 # 1M/500/10k Train/Val/Test total
     examples_per_cluster: int = (train_count + val_count + test_count) // (num_clusters - num_clusters_to_exclude)
     extra_examples: int = (train_count + val_count + test_count) % (num_clusters - num_clusters_to_exclude)
     output_shard_size: int = 100_000
@@ -40,16 +41,6 @@ class DistillConfig:
         # Not used here, but needed later to not hit disk quotas
         self.cache_dir = self.base_dir / f"MiniPile_{self.edition}_Cache"
         self.cache_dir.mkdir(exist_ok=True, parents=True)
-        # Distribute the needed extra examples to be drawn from across the clusters most evenly
-        self.cluster_extra_samples = [0] * self.num_clusters
-        extra_examples_left = self.extra_examples
-        # Distribute extra examples across non-excluded clusters
-        for cluster in range(self.num_clusters):
-            if cluster not in self.excluded_clusters and extra_examples_left > 0:
-                self.cluster_extra_samples[cluster] = 1
-                extra_examples_left -= 1
-        # Verify all extra examples are distributed
-        assert extra_examples_left == 0, f"Failed to distribute all extra examples: {extra_examples_left} left"
 
 class MiniCorpusWriter:
     def __init__(self, output_dir: Path, edition: str, output_shard_size: int):
@@ -91,15 +82,12 @@ class MiniCorpusWriter:
 class MiniCorpusDistiller:
     def __init__(self, config: DistillConfig):
         self.config = config
-        # Validate configuration parameters for cluster exclusion
-        if len(self.config.excluded_clusters) != self.config.num_clusters_to_exclude:
-            raise ValueError(f"Must exclude {self.config.num_clusters_to_exclude} clusters. You provided {len(self.config.excluded_clusters)} clusters.")
         self._load_total_cluster_info()
         self._compute_shard_scopes()
         self.shard_counter: int = 0
         self.writer = MiniCorpusWriter(output_dir=config.output_dir,
-                                       edition=config.edition,
-                                       output_shard_size=config.output_shard_size)
+                                     edition=config.edition,
+                                     output_shard_size=config.output_shard_size)
     
     def _load_total_cluster_info(self):
         # Load general cluster information JSON file, populate class attribute
@@ -127,31 +115,25 @@ class MiniCorpusDistiller:
         if last_shard_size > 0:
             self.shard_idxs.append(cumulative_idxs)
 
+    def _read_size_for_cluster(self, cluster_idx: int) -> int:
+        return self.cluster_info[str(cluster_idx)]['total_examples']
+    
+    def _get_density(self, cluster_idx: int) -> float:
+        # We have the fields 'total_examples', 'average_distance' and 'sum_distance' in the cluster info, using that to calculate the density of a cluster
+        return self.cluster_info[str(cluster_idx)]['sum_distance'] / self.cluster_info[str(cluster_idx)]['total_examples'] if self.cluster_info[str(cluster_idx)]['total_examples'] > 0 else 0.0
 
     def _read_idxs_for_cluster(self, cluster_idx: int) -> List[int]:
         # Read document indices assoricated with a given cluster
         cluster_file = self.config.cluster_dir / f"cluster_{cluster_idx:03d}.jsonl"
-        cluster_indices = []
+        cluster_idxs = []
         with jsonlines.open(cluster_file) as reader:
             for entry in reader:
                 if entry['cluster'] == cluster_idx:
-                    cluster_indices.append(entry['idx'])
-        return cluster_indices
+                    cluster_idxs.append(entry['idx'])
+        return cluster_idxs
     
-    def _sample_cluster_docs(self, valid_indices: List[int], num_samples: int) -> List[int]:
-        # Sample documents from cluster, *explicitly* randomly
-        # valid_indices are already somewhat shuffled, but we really make sure here, I'm paranoid, that's also why I made it its own function
-        # The paper does not explicitly state whether cluster-size-proportioned sampling was applied
-        #
-        # I see it like this:
-        # While MiniPile doesn't prohibit proportional sampling, it does not mention it as part of the methodology either.
-        # I interpret that any adjustments made for that can be seen as extending or refining the methodology rather than replicating it as stated.
-        # The paper does not mention proportional sampling or any attempt to adjust the example count sampled based on cluster sizes.
-        # This omission suggests a primary focus was simplicity and achieving a set, fixed (1M/500/10k) dataset size, rather than perfect proportional representation.
-        # Proportional sampling would moreover make it more difficult to hit the specific dataset size goal with the parts of the pipeline that are in fact described.
-        #
-        # Still, I just have to acknowledge that proportional sampling could have clear advantages here.
-        return self.config.rng.choice(valid_indices, size=min(len(valid_indices), num_samples), replace=False).tolist()
+    def _sample_cluster_docs(self, valid_idxs: List[int], num_samples: int) -> List[int]:
+        return self.config.rng.choice(valid_idxs, size=min(len(valid_idxs), num_samples), replace=False).tolist()
     
     def _shard_with_idx(self, idx: int) -> int:
         # Find the shard containing a specific index by entry count heuristic
@@ -164,16 +146,43 @@ class MiniCorpusDistiller:
     def _shuffle_split(self, idxs_to_shuffle: List[int]) -> Dict[str, List[int]]:
         # Shuffle all_indices, split for train/val/test splits
         self.config.rng.shuffle(idxs_to_shuffle)
-        return {'train': idxs_to_shuffle[:self.config.train_count],
-                'validation': idxs_to_shuffle[self.config.train_count:(self.config.train_count + self.config.val_count)],
-                'test': idxs_to_shuffle[(self.config.train_count + self.config.val_count):(self.config.train_count + self.config.val_count + self.config.test_count)]}
+
+        # split the shuffled indices proportionally to the original dataset, but dynamically based on this setting's cluster sizes
+        # Maintaining the rough train/val/test split from the paper, that is e.g. proportion of 1.000.000 to 1.010.500 for train
+        train_count = int(len(idxs_to_shuffle) * 0.9896091)
+        val_count = int(len(idxs_to_shuffle) * 0.009896091)
+        test_count = len(idxs_to_shuffle) - train_count - val_count
+
+        # Hacky, but ok weight balancing
+        while train_count + val_count + test_count < len(idxs_to_shuffle):
+            test_count += 1
+        while train_count + val_count + test_count > len(idxs_to_shuffle):
+            if test_count > 100:
+                test_count -= 1
+            elif val_count > 5000:
+                val_count -= 1
+            else:
+                train_count -= 1
+
+        return {'train': idxs_to_shuffle[:train_count],
+                'validation': idxs_to_shuffle[train_count:(train_count + val_count)],
+                'test': idxs_to_shuffle[(train_count + val_count):(train_count + val_count + test_count)]}
     
     def _process_cluster(self, cluster: int) -> Set[int]:
         if cluster not in self.config.excluded_clusters:
             # Get document indices associcated with cluster
-            valid_indices = self._read_idxs_for_cluster(cluster)
-            # We want to extract this many examples from the cluster by random sampling
-            return set(self._sample_cluster_docs(valid_indices, self.config.examples_per_cluster + self.config.cluster_extra_samples[cluster]))
+            valid_idxs = self._read_idxs_for_cluster(cluster)
+            # Total number of documents in the non-excluded clusters
+            cluster_size = self._read_size_for_cluster(cluster)
+            total_idxs_sum = sum(self._read_size_for_cluster(cluster) for cluster in range(self.config.num_clusters) if cluster not in self.config.excluded_clusters)
+            density = self._get_density(cluster)
+            # Proportion of documents to sample from this cluster. Favor sparse clusters for more diverse samples
+            cluster_proportion = cluster_size / total_idxs_sum * (1 - self.config.density_weight * density) # The density is subtracted from 1 to favor diverse / sparse clusters
+            del total_idxs_sum, density, cluster_size
+            # Ensure we don't exceed available indices by accident
+            samples_for_this_cluster = min(int((self.config.train_count + self.config.val_count + self.config.test_count) * cluster_proportion), len(valid_idxs))
+            del cluster_proportion
+            return set(self._sample_cluster_docs(valid_idxs, samples_for_this_cluster))
         else:
             return set()
 
@@ -186,6 +195,39 @@ class MiniCorpusDistiller:
         # This should show a nice distance between the first and last document index, roughly spanning Pile dataset size
         print(f"[Info] Min document idx: {idxs_to_extract[0]}, Max document idx: {idxs_to_extract[-1]}")
         print(f"[+] Total documents to extract: {len_idxs_to_extract}. Shuffling and splitting.")
+        # If len_idxs_to_extract is smaller than 946,465, add more examples from the clusters, across all clusters
+        if len_idxs_to_extract < 946_465:
+            print(f"[!] Adding {946_465 - len_idxs_to_extract} examples from all clusters to reach the more comparable count of 946,465.")
+            # Calculate the total size of non-excluded clusters once
+            total_cluster_size = sum(self._read_size_for_cluster(cluster)
+                                     for cluster in range(self.config.num_clusters)
+                                     if cluster not in self.config.excluded_clusters)
+            remaining_samples = 946_465 - len_idxs_to_extract
+            already_sampled = set(idxs_to_extract)  # Track all already sampled indices
+            
+            for cluster in tqdm(range(self.config.num_clusters), desc="Adding Extra Examples", unit="cluster"):
+                if cluster not in self.config.excluded_clusters:
+                    valid_idxs = self._read_idxs_for_cluster(cluster)
+                    valid_idxs = [idx for idx in valid_idxs if idx not in already_sampled]  # Excluding the already sampled indices from add-able candidates
+                    cluster_size = self._read_size_for_cluster(cluster)
+                    cluster_proportion = cluster_size / total_cluster_size
+                    # Distribute remaining samples proportionally
+                    samples_for_this_cluster = min(int(remaining_samples * cluster_proportion), len(valid_idxs))
+                    sampled_idxs = self._sample_cluster_docs(valid_idxs, samples_for_this_cluster)
+                    
+                    # Add new indices to the output list and update the tracker
+                    idxs_to_extract.extend(sampled_idxs)
+                    already_sampled.update(sampled_idxs)
+                    
+                    del valid_idxs, sampled_idxs, cluster_size, cluster_proportion
+                    len_idxs_to_extract += samples_for_this_cluster
+                    # Adjust remaining samples
+                    remaining_samples -= samples_for_this_cluster
+                    
+                    # Stop once the target is reached
+                    if len_idxs_to_extract >= 946_465:
+                        break
+            del total_cluster_size, already_sampled, remaining_samples
         # I want at all cost to avoid having consecutive indices from the same cluster overly represented in the same split
         data_splits = self._shuffle_split(idxs_to_extract)
         del idxs_to_extract
@@ -208,20 +250,20 @@ class MiniCorpusDistiller:
                 idxs_by_shard[shard_idx].append(idx)
 
         # The sum of all indices in idxs_by_shard should equal the total number of indices to extract
-        assert sum(len(indices) for indices in idxs_by_shard.values()) == len(split_idxs_to_extract)
+        assert sum(len(idxs) for idxs in idxs_by_shard.values()) == len(split_idxs_to_extract)
         
         # These are the Parquet files that contain the documents
         parquet_files = sorted(Path(self.config.embd_dir).glob("shard_*.parquet"))
-        for shard_idx, indices in tqdm(idxs_by_shard.items(), desc=f"Processing {split_name} Shards", unit="shard"):
+        for shard_idx, idxs in tqdm(idxs_by_shard.items(), desc=f"Processing {split_name} Shards", unit="shard"):
             # Read the indices accumulated for each shard and persist them to a new Parquet file
-            self._process_shard(shard_idx, indices, parquet_files[shard_idx], split_name)
+            self._process_shard(shard_idx, idxs, parquet_files[shard_idx], split_name)
         
         del idxs_by_shard
         # Pack up your stuff, we're done with the split
         self.writer.finalize()
 
     def _read_fast_parquet(self, file_path: str, idxs: List[int]) -> np.ndarray:
-        # This is really fast, really memory-optimized, but craps all over the cache; I can't control that.
+        # This is really fast, really memory-optimized, but bloats the cache; I can't control that.
         parquet = ParquetFile(file_path) # https://github.com/dask/fastparquet/issues/386
         result = parquet.to_pandas(columns=['text'])['text'].to_numpy()[idxs]
         del parquet
@@ -260,13 +302,12 @@ if __name__ == "__main__":
     distiller = MiniCorpusDistiller(config)
     distiller.build_minicorpus()
 
-# tmux new -s mini_k440
+# tmux new -s mini_31_low
 # conda activate minipile
-# (pip install jsonlines)
-# python 03_distill_pile_embed_idea_4_k440.py
+# python 04_distill_pile_embed_idea_3.1_density_low.py
 # Detach from tmux session: Ctrl-b followed by d
-# Reattach to tmux session: tmux attach -t mini_k440
+# Reattach to tmux session: tmux attach -t mini_31_low
 # tmux list-sessions
-# tmux kill-session -t mini_k440
+# tmux kill-session -t mini_31_low
 #
 # 

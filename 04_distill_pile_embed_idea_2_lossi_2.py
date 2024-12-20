@@ -11,30 +11,40 @@ from fastparquet import ParquetFile
 from dataclasses import dataclass, field
 from multiprocessing import Pool, cpu_count
 
+## Idea 2:
+#   Lossi (Loss-informed Sampling) is a one-shot proxy-based geometric sampling approach that is guided by a loss-based importance heuristic, 
+#   deviating from the original distillation process in the following ways:
+#
+#   - Per cluster: Uniformly sample $n$ (e.g. $1,000$) documents and determine their loss with a small Pythia $70\text{M}$ proxy model
+#   - Use the mean loss as a heuristic for the cluster's informativeness and weight the cluster's representation in the final dataset by this value
+
+# This is a lot. To make this resource-effectively applicable, I split this into several scripts.
+# This is script 2 of idea 2:
+#   - Use the 'cluster_loss.jsonl' to - per cluster - read the count of documents to sample, assembing "MiniPile_Lossi_1"
+
 @dataclass
 class DistillConfig:
     base_dir: Path = Path("/vol/tmp/koppelmm")
-    cluster_dir: Path = base_dir / "MiniPile_BatchKMeans_Double/clustering_sorted"
-    cluster_info_path: Path = base_dir / "MiniPile_BatchKMeans_Double/clustering_results/cluster_info_for_inspection.json"
+    cluster_dir: Path = base_dir / "MiniPile_BatchKMeans/clustering_sorted"
+    cluster_info_path: Path = base_dir / "MiniPile_BatchKMeans/clustering_results/cluster_info_for_inspection.json"
     embd_dir: Path = base_dir / "Pile_Deduplicated_Embd"
-    num_clusters: int = 440 # As per paper
-    num_clusters_to_exclude: int = 70 # As per paper
-    density_weight: float = 0.5
-    edition: str = "k440Density" # Version of MiniPile, distinguishes file naming + output directory
-    excluded_clusters: Set[int] = field(default_factory=lambda: {3, 6, 7, 8, 9, 19, 20, 24, 26, 32, 39, 46, 47, 48, 49, 50, 51, 54, 57, 60, 69,
-                                                                 85, 89, 91, 92, 106, 108, 111, 120, 144, 147, 152, 162, 165, 169, 172, 176, 178,
-                                                                 189, 199, 203, 208, 210, 212, 215, 216, 224, 227, 243, 244, 254, 264, 274, 283,
-                                                                 289, 299, 304, 322, 333, 338, 350, 369, 370, 388, 401, 404, 410, 413, 417, 430})
+    cluster_proportions_path: Path = base_dir / 'MiniPile_Lossi/cluster_loss.jsonl'
+    num_clusters: int = 220 # As per paper
+    num_clusters_to_exclude: int = 38 # As per paper
+    edition: str = "Lossi_1" # Version of MiniPile, distinguishes file naming + output directory
+    excluded_clusters: Set[int] = field(default_factory=lambda: {10, 15, 16, 22, 26, 28, 35, 37, 39, 40, 44, 46, 
+                                                                 51, 57, 61, 64, 78, 86, 87, 88, 90, 94, 99, 101,
+                                                                 102, 103, 111, 114, 152, 155, 163, 166, 167, 181,
+                                                                 196, 200, 218, 219})
     train_count: int = 1_000_000
     val_count: int = 500
-    test_count: int = 10_000 # 1M/500/10k Train/Val/Test total
-    examples_per_cluster: int = (train_count + val_count + test_count) // (num_clusters - num_clusters_to_exclude)
-    extra_examples: int = (train_count + val_count + test_count) % (num_clusters - num_clusters_to_exclude)
+    test_count: int = 10_000 # 1M/500/10k Train/Val/Test total (for best comparability to baseline)
     output_shard_size: int = 100_000
     pile_size: int = 134_318_121 # Could've been read from the metadata file, too
     rng: np.random.Generator = np.random.default_rng(42) # reproducibility
 
     def __post_init__(self):
+        # Just nicer and more distinct to place here
         self.output_dir = self.base_dir / f"MiniPile_{self.edition}"
         self.output_dir.mkdir(exist_ok=True, parents=True)
         # Not used here, but needed later to not hit disk quotas
@@ -82,12 +92,18 @@ class MiniCorpusDistiller:
     def __init__(self, config: DistillConfig):
         self.config = config
         self._load_total_cluster_info()
+        self._load_proportion_info()
         self._compute_shard_scopes()
         self.shard_counter: int = 0
         self.writer = MiniCorpusWriter(output_dir=config.output_dir,
-                                     edition=config.edition,
-                                     output_shard_size=config.output_shard_size)
+                                       edition=config.edition,
+                                       output_shard_size=config.output_shard_size)
     
+    def _load_proportion_info(self):
+        # Load cluster proportion information JSONL file, populate class attribute
+        with jsonlines.open(self.config.cluster_proportions_path) as reader:
+            self.cluster_proportions = {entry['cluster_idx']: int(np.round(entry['proportion'])) for entry in reader}
+
     def _load_total_cluster_info(self):
         # Load general cluster information JSON file, populate class attribute
         with open(self.config.cluster_info_path, 'r') as f:
@@ -95,6 +111,7 @@ class MiniCorpusDistiller:
     
     def _compute_shard_scopes(self):
         # Precompute cumulative entries for efficient document lookup
+        # Serves to boost lookup performance, and is as hacky as it gets
         self.shard_idxs = []
         cumulative_idxs = 0
         num_shards = len(list(Path(self.config.embd_dir).glob("shard_*.parquet")))
@@ -113,13 +130,6 @@ class MiniCorpusDistiller:
         last_shard_size = self.config.pile_size - cumulative_idxs
         if last_shard_size > 0:
             self.shard_idxs.append(cumulative_idxs)
-
-    def _read_size_for_cluster(self, cluster_idx: int) -> int:
-        return self.cluster_info[str(cluster_idx)]['total_examples']
-    
-    def _get_density(self, cluster_idx: int) -> float:
-        # We have the fields 'total_examples', 'average_distance' and 'sum_distance' in the cluster info, using that to calculate the density of a cluster
-        return self.cluster_info[str(cluster_idx)]['sum_distance'] / self.cluster_info[str(cluster_idx)]['total_examples'] if self.cluster_info[str(cluster_idx)]['total_examples'] > 0 else 0.0
 
     def _read_idxs_for_cluster(self, cluster_idx: int) -> List[int]:
         # Read document indices assoricated with a given cluster
@@ -171,17 +181,8 @@ class MiniCorpusDistiller:
         if cluster not in self.config.excluded_clusters:
             # Get document indices associcated with cluster
             valid_idxs = self._read_idxs_for_cluster(cluster)
-            # Total number of documents in the non-excluded clusters
-            cluster_size = self._read_size_for_cluster(cluster)
-            total_idxs_sum = sum(self._read_size_for_cluster(cluster) for cluster in range(self.config.num_clusters) if cluster not in self.config.excluded_clusters)
-            density = self._get_density(cluster)
-            # Proportion of documents to sample from this cluster. Favor sparse clusters for more diverse samples
-            cluster_proportion = cluster_size / total_idxs_sum * (1 - self.config.density_weight * density) # The density is subtracted from 1 to favor diverse / sparse clusters
-            del total_idxs_sum, density, cluster_size
-            # Ensure we don't exceed available indices by accident
-            samples_for_this_cluster = min(int((self.config.train_count + self.config.val_count + self.config.test_count) * cluster_proportion), len(valid_idxs))
-            del cluster_proportion
-            return set(self._sample_cluster_docs(valid_idxs, samples_for_this_cluster))
+            # Sampling the pre-computed cluster proportion, while ensuring we don't exceed available indices by accident
+            return set(self._sample_cluster_docs(valid_idxs, min(self.cluster_proportions[cluster], len(valid_idxs))))
         else:
             return set()
 
@@ -268,10 +269,12 @@ if __name__ == "__main__":
     distiller = MiniCorpusDistiller(config)
     distiller.build_minicorpus()
 
-# tmux new -s mini_5
+# tmux new -s mini_2
 # conda activate minipile
-# python 03_distill_pile_embed_idea_5_k440_density.py
+# python 04_distill_pile_embed_idea_2_lossi_2.py
 # Detach from tmux session: Ctrl-b followed by d
-# Reattach to tmux session: tmux attach -t mini_5
+# Reattach to tmux session: tmux attach -t mini_2
 # tmux list-sessions
-# tmux kill-session -t mini_5
+# tmux kill-session -t mini_2
+#
+# Took ~2 hours, mostly due to switch to fastparquet.
