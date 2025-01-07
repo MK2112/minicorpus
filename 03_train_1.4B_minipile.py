@@ -146,7 +146,7 @@ def training():
         num_train_epochs=1.5,            # Since train_iters gets set, use num_train_epochs=1.5 like for The Pile
         per_device_train_batch_size=batch_size,   # Gives an effective batch size of 1024 after grad accum
         per_device_eval_batch_size=batch_size,    # Same as training batch size
-        gradient_accumulation_steps=(total_batch // batch_size), # Achieve a batch size of 1024
+        gradient_accumulation_steps=(total_batch // batch_size // device_count), # Achieve a batch size of 1024
         learning_rate=2e-4,              # Default Pythia 1.4B-specific
         weight_decay=0.01,               # Default Pythia 160M and 1.4B
         max_steps=1024,                  # Adjusted for MiniPile (https://discuss.huggingface.co/t/how-does-max-steps-affect-the-number-of-samples-the-model-sees/69681)
