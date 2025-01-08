@@ -188,8 +188,6 @@ def training():
                     optimizers=(optimizer, scheduler))
 
     trainer.train()
-
-    # Why is this a two-step process?!
     trainer.save_model(str(base_path / "pythia160m_minipile_k440Inter_trained")) # This saves the model weights
 
 if __name__ == "__main__":

@@ -221,8 +221,6 @@ def training():
                       optimizers=(optimizer, scheduler))
 
     trainer.train()
-
-    # Why is this a two-step process?!
     trainer.save_model(str(base_path / output_folder)) # This saves the model weights
 
 def bench():
