@@ -28,13 +28,13 @@ results = simple_evaluate(model=pythia_minipile_hflm,
                           device="cuda",
                           limit=None)
 
-with open('03_eval_1.4B_dedup_pile_easy.txt', 'w') as f:
+with open('04_eval_1.4B_dedup_pile_easy.txt', 'w') as f:
     f.write(str(results))
 
 # Make the table and save it too
 table = utils.make_table(results)
 print(table)
-with open('03_eval_1.4B_dedup_pile_table_easy.txt', 'w') as f:
+with open('04_eval_1.4B_dedup_pile_table_easy.txt', 'w') as f:
     f.write(table)
 
 # tmux new -s bench_14B
