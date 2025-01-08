@@ -10,21 +10,20 @@ from typing import Set, Dict, List
 from fastparquet import ParquetFile
 from dataclasses import dataclass, field
 from multiprocessing import Pool, cpu_count
-
-# TODO: Incomplete
+from sklearn.metrics.pairwise import cosine_distances
 
 @dataclass
 class DistillConfig:
     base_dir: Path = Path("/vol/tmp/koppelmm")
     cluster_dir: Path = base_dir / "MiniPile_BatchKMeans_Double/clustering_sorted"
     cluster_info_path: Path = base_dir / "MiniPile_BatchKMeans_Double/clustering_results/cluster_info_for_inspection.json"
-    cluster_centers_path: Path = base_dir / "MiniPile_BatchKMeans_Double/cluster_centers.npy"
+    cluster_centroids_path: Path = base_dir / "MiniPile_BatchKMeans_Double/cluster_centers.npy"
     embd_dir: Path = base_dir / "Pile_Deduplicated_Embd"
-    num_clusters: int = 440 # As per paper
-    num_clusters_to_exclude: int = 70 # As per paper
-    density_weight: float = 0.4 # This was the only one, we have to triple the hyperparams to accomodate diversity
-    size_weight: float = 0.4
-    diversity_weight: float = 0.2
+    num_clusters: int = 440
+    num_clusters_to_exclude: int = 70
+    density_weight: float = 0.33 # Cluster density impact weight
+    size_weight: float = 0.33 # Cluster size impact weight
+    diversity_weight: float = 0.33 # Cluster diversity impact weight
     edition: str = "k440Inter" # Version of MiniPile, distinguishes file naming + output directory
     excluded_clusters: Set[int] = field(default_factory=lambda: {3, 6, 7, 8, 9, 19, 20, 24, 26, 32, 39, 46, 47, 48, 49, 50, 51, 54, 57, 60, 69,
                                                                  85, 89, 91, 92, 106, 108, 111, 120, 144, 147, 152, 162, 165, 169, 172, 176, 178,
@@ -90,20 +89,36 @@ class MiniCorpusDistiller:
         self._compute_shard_scopes()
         self.shard_counter: int = 0
         self.writer = MiniCorpusWriter(output_dir=config.output_dir,
-                                     edition=config.edition,
-                                     output_shard_size=config.output_shard_size)
-        self.centroids = np.load(config.cluster_centers_path)
-        self._computer_cluster_diversities()
+                                       edition=config.edition,
+                                       output_shard_size=config.output_shard_size)
+        self.centroids = np.load(config.cluster_centroids_path)
+        self._compute_cluster_diversities()
     
     def _compute_cluster_diversities(self):
-        """Compute diversity scores for each cluster based on its centroid's average distance to other centroids."""
+        # Diversity scores for each cluster based on centroid's avg-dist to other centroids
         self.cluster_diversities = {}
         for i in range(self.config.num_clusters):
             if i not in self.config.excluded_clusters:
                 # Calculate average cosine distance to all other centroids
                 other_centroids = np.delete(self.centroids, i, axis=0)
-                distances = # TODO: Calculate cosine distances
+                distances = cosine_distances([self.centroids[i]], other_centroids)[0]
+                self.cluster_diversities[i] = np.mean(distances)
 
+    def _get_cluster_score(self, cluster_idx: int) -> float:
+        if cluster_idx in self.config.excluded_clusters:
+            return 0.0
+        # Putting this before the pool, centralized, doesn't work, don't know why
+        total_size = sum(self._read_size_for_cluster(c) for c in range(self.config.num_clusters) if c not in self.config.excluded_clusters)
+        # Get cluster size proportion
+        size_score = self._read_size_for_cluster(cluster_idx) / total_size
+        # Produce highest score for lowest density
+        density_score = 1 - self._get_density(cluster_idx)
+        # Get normalized diversity score
+        diversity_score = self.cluster_diversities[cluster_idx] / max(self.cluster_diversities.values())
+        # Combine and weight partial scores for cluster score to emerge
+        return (self.config.size_weight * size_score +
+                self.config.density_weight * density_score +
+                self.config.diversity_weight * diversity_score)
 
     def _load_total_cluster_info(self):
         # Load general cluster information JSON file, populate class attribute
@@ -183,22 +198,23 @@ class MiniCorpusDistiller:
         return {'train': idxs_to_shuffle[:train_count],
                 'validation': idxs_to_shuffle[train_count:(train_count + val_count)],
                 'test': idxs_to_shuffle[(train_count + val_count):(train_count + val_count + test_count)]}
-    
+
     def _process_cluster(self, cluster: int) -> Set[int]:
         if cluster not in self.config.excluded_clusters:
-            # Get document indices associcated with cluster
+            # Get document indices associated with cluster
             valid_idxs = self._read_idxs_for_cluster(cluster)
-            # Total number of documents in the non-excluded clusters
-            cluster_size = self._read_size_for_cluster(cluster)
-            total_idxs_sum = sum(self._read_size_for_cluster(cluster) for cluster in range(self.config.num_clusters) if cluster not in self.config.excluded_clusters)
-            density = self._get_density(cluster)
-            # Proportion of documents to sample from this cluster. Favor sparse clusters for more diverse samples
-            cluster_proportion = cluster_size / total_idxs_sum * (1 - self.config.density_weight * density) # The density is subtracted from 1 to favor diverse / sparse clusters
-            del total_idxs_sum, density, cluster_size
-            # Ensure we don't exceed available indices by accident
-            samples_for_this_cluster = min(int((self.config.train_count + self.config.val_count + self.config.test_count) * cluster_proportion), len(valid_idxs))
-            del cluster_proportion
-            return set(self._sample_cluster_docs(valid_idxs, samples_for_this_cluster))
+            # Determine the cluster's relevance/importance/weight score for sampling
+            cluster_score = self._get_cluster_score(cluster)
+            # Don't know why, but putting that before the pooling doesn't work at all
+            total_scores = sum(self._get_cluster_score(c) for c in range(self.config.num_clusters) if c not in self.config.excluded_clusters)
+            # Derive proportion from the normalized score (otherwise things would be all over the place)
+            cluster_proportion = cluster_score / total_scores
+            # Determine how many samples to plug from the cluster
+            total_samples = self.config.train_count + self.config.val_count + self.config.test_count
+            # Fixed the naming here, the one before was misleading/hideous
+            cluster_sample_count = min(int(total_samples * cluster_proportion), len(valid_idxs))
+            del cluster_proportion, total_scores, cluster_score
+            return set(self._sample_cluster_docs(valid_idxs, cluster_sample_count))
         else:
             return set()
 
@@ -285,12 +301,12 @@ if __name__ == "__main__":
     distiller = MiniCorpusDistiller(config)
     distiller.build_minicorpus()
 
-# tmux new -s mini_5
+# tmux new -s mini_6
 # conda activate minipile
-# python 04_distill_pile_embed_idea_5_k440_density.py
+# python 04_distill_pile_embed_idea_6_inter-intra.py
 # Detach from tmux session: Ctrl-b followed by d
-# Reattach to tmux session: tmux attach -t mini_5
+# Reattach to tmux session: tmux attach -t mini_6
 # tmux list-sessions
-# tmux kill-session -t mini_5
+# tmux kill-session -t mini_6
 #
 #
