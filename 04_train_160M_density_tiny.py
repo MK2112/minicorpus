@@ -78,7 +78,7 @@ def training():
 
     minipile_val = load_dataset("parquet",
                                 data_files={
-                                    "validation": str(base_path / "MiniPile_DensityProportioned" / "minipile_DensityTiny_validation_shard_*.parquet"),
+                                    "validation": str(base_path / "MiniPile_DensityTiny" / "minipile_DensityTiny_validation_shard_*.parquet"),
                                 },
                                 cache_dir=str(base_path / "MiniPile_DensityTiny_Cache"),
                                 split="validation")
@@ -191,14 +191,16 @@ def training():
     trainer.save_model(str(base_path / "pythia160m_minipile_DensityTiny_trained")) # This saves the model weights
 
 if __name__ == "__main__":
+    torch.cuda.empty_cache()
     training()
 
-# tmux new -s 160m_minipile_density
+# tmux new -s 160m_minipile_density-tiny
 # conda activate minipile
-# torchrun --nproc_per_node=4 03_train_160M_density.py
-# I ran with CUDA_VISIBLE_DEVICES=2 torchrun --nproc_per_node=1 03_train_160M_density.py
+# I ran with CUDA_VISIBLE_DEVICES=1 torchrun --nproc_per_node=1 04_train_160M_density_tiny.py
 # May need to reset in later run, I don't know
 # Detach from tmux session: Ctrl-b followed by d
-# Reattach to tmux session: tmux attach -t 160m_minipile_density
+# Reattach to tmux session: tmux attach -t 160m_minipile_density-tiny
 # tmux list-sessions
-# tmux kill-session -t 160m_minipile_density
+# tmux kill-session -t 160m_minipile_density-tiny
+#
+# 
