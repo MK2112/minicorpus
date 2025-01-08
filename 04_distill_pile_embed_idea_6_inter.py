@@ -303,7 +303,7 @@ if __name__ == "__main__":
 
 # tmux new -s mini_6
 # conda activate minipile
-# python 04_distill_pile_embed_idea_6_inter-intra.py
+# python 04_distill_pile_embed_idea_6_inter.py
 # Detach from tmux session: Ctrl-b followed by d
 # Reattach to tmux session: tmux attach -t mini_6
 # tmux list-sessions
