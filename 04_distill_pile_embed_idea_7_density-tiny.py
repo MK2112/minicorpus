@@ -19,7 +19,7 @@ class DistillConfig:
     embd_dir: Path = base_dir / "Pile_Deduplicated_Embd"
     num_clusters: int = 220 # As per paper
     num_clusters_to_exclude: int = 38 # As per paper
-    alpha: float = 0.5
+    density_weight: float = 0.5
     edition: str = "DensityTiny" # Version of MiniPile, distinguishes file naming + output directory
     excluded_clusters: Set[int] = field(default_factory=lambda: {10, 15, 16, 22, 26, 28, 35, 37, 39, 40, 44, 46, 
                                                                  51, 57, 61, 64, 78, 86, 87, 88, 90, 94, 99, 101,
@@ -27,7 +27,7 @@ class DistillConfig:
                                                                  196, 200, 218, 219})
     train_count: int = 900_007
     val_count: int = 534
-    test_count: int = 10_676 # Just correcting rounding errors: This produces 872967:500:10000
+    test_count: int = 10_676 # Just correcting rounding errors: This produces 842967:500:10000
     examples_per_cluster: int = (train_count + val_count + test_count) // (num_clusters - num_clusters_to_exclude)
     extra_examples: int = (train_count + val_count + test_count) % (num_clusters - num_clusters_to_exclude)
     output_shard_size: int = 100_000
@@ -171,7 +171,7 @@ class MiniCorpusDistiller:
             total_idxs_sum = sum(self._read_size_for_cluster(cluster) for cluster in range(self.config.num_clusters) if cluster not in self.config.excluded_clusters)
             density = self._get_density(cluster)
             # Proportion of documents to sample from this cluster. Favor sparse clusters for more diverse samples
-            cluster_proportion = cluster_size / total_idxs_sum * (1 - self.config.alpha * density) # The density is subtracted from 1 to favor diverse / sparse clusters
+            cluster_proportion = cluster_size / total_idxs_sum * (1 - self.config.density_weight * density) # The density is subtracted from 1 to favor diverse / sparse clusters
             del total_idxs_sum, density, cluster_size
             # Ensure we don't exceed available indices by accident
             samples_for_this_cluster = min(int((self.config.train_count + self.config.val_count + self.config.test_count) * cluster_proportion), len(valid_idxs))
