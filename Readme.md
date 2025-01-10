@@ -87,6 +87,9 @@ The mending and adapting of the pipeline for RefinedWeb is documented in the Jup
 
 ## Produced Artifacts
 
+- Go with [minipile_density-proportioned](https://huggingface.co/datasets/Marcus2112/minipile_density-proportioned) if you want to attain the highest benchmark results with lower than 1M examples.
+- Go with [minipile_density-proportioned_nano](https://huggingface.co/datasets/Marcus2112/minipile_density-proportioned_nano) if you want to attain largely similar benchmark results to the original MiniPile with less than 750k examples.
+
 ### Datasets
 
 - [pile_dedup_embeddings_clusters_k220](https://huggingface.co/datasets/Marcus2112/pile_dedup_embeddings_clusters_k220)
