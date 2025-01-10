@@ -65,17 +65,16 @@ The `04_improve_minipile.ipynb` notebook contains a theoretical section that dis
 These theoretical improvements for assembly are:
 
 - "Sparse Sampling of Embeddings with Similarity Hashing", related to:
-    - https://www.pinecone.io/learn/series/faiss/locality-sensitive-hashing/
-    - https://arxiv.org/pdf/2208.05648
-    - https://arxiv.org/pdf/1408.2927
-    - https://mediatum.ub.tum.de/doc/1655492/ptz317jfxiatpjlwxrpcuimu1.2022-11-01_einreichung_mediatum_titelblatt_neu.pdf
+    - [Locality Sensitive Hashing (LSH): The Illustrated Guide (pinecone.io)](https://www.pinecone.io/learn/series/faiss/locality-sensitive-hashing/)
+    - [Embedding Compression with Hashing for Efficient Representation Learning in Large-Scale Graph (Yeh, et al. 2022)](https://arxiv.org/pdf/2208.05648)
+    - [Hashing for Similarity Search: A Survey (Wang, et al. 2014)](https://arxiv.org/pdf/1408.2927)
+    - [Efficient Measures for Processing and Exploring Large-Scale Data Domains (Reinbold, Christian. 2022)](https://mediatum.ub.tum.de/doc/1655492/ptz317jfxiatpjlwxrpcuimu1.2022-11-01_einreichung_mediatum_titelblatt_neu.pdf)
 
 - "Double-Proxied Cross-Entropy-based Sampling", related to:
-    - https://www.sciencedirect.com/science/article/pii/S0306457322003508
+    - [Extracting representative subset from extensive text data for training pre-trained language models (Suzuki, et al. 2023)](https://www.sciencedirect.com/science/article/pii/S0306457322003508)
 
 - "Semantic Deduplication as Post-Processing for the distilled dataset", related to:
-    - https://arxiv.org/pdf/2303.09540
-    - deemed necessary as the clustering process still indicated presence of duplicates in Pile Deduplicated, this could be mitigated on the distilled dataset level.
+    - [SemDeDup: Data-efficient learning at web-scale through semantic deduplication (Abbas, et al. 2023)](https://arxiv.org/pdf/2303.09540)
 
 ## Preparing for general Applicability
 
@@ -117,7 +116,9 @@ The mending and adapting of the pipeline for RefinedWeb is documented in the Jup
 - [minipile_density-proportioned_tiny](https://huggingface.co/datasets/Marcus2112/minipile_density-proportioned_tiny)
     - contains the text and pile idx per document of a MiniPile that was cluster-wise sampled from proportionally to an equally weighted factor of cluster density and cluster size, reduced in total example count to 90% of the above density-proportioned MiniPile.
 - [minipile_density-proportioned_nano](https://huggingface.co/datasets/Marcus2112/minipile_density-proportioned_nano)
-    - retaining only 75% of the original MiniPile example count.
+    - retaining 75% of the original MiniPile example count, sampled with size-density-proportionate sampling at $\omega = 0.5$.
+- [minipile_density-proportioned_pico](https://huggingface.co/datasets/Marcus2112/minipile_density-proportioned_pico)
+    - retaining 25% of the original MiniPile example count, sampled with size-density-proportionate sampling at $\omega = 0.5$.
 
 ### Models
 
@@ -133,6 +134,8 @@ The mending and adapting of the pipeline for RefinedWeb is documented in the Jup
 - [pythia-160m-minipile_k440_inter-density-proportioned](https://huggingface.co/Marcus2112/pythia-160m-minipile_k440_inter-density-proportioned)
 - [pythia-160m-minipile_k440_high-inter_density-proportioned](https://huggingface.co/Marcus2112/pythia-160m-minipile_k440_high-inter_density-proportioned)
 - [pythia-160m-minipile_tiny_density-proportioned](https://huggingface.co/Marcus2112/pythia-160m-minipile_tiny_density-proportioned)
+- [pythia-160m-minipile_nano_density-proportioned](https://huggingface.co/Marcus2112/pythia-160m-minipile_nano_density-proportioned)
+- [pythia-160m-minipile_pico_density-proportioned](https://huggingface.co/Marcus2112/pythia-160m-minipile_pico_density-proportioned)
 
 ## Related Work
 
@@ -147,3 +150,6 @@ The mending and adapting of the pipeline for RefinedWeb is documented in the Jup
 - [Embedding Compression with Hashing for Efficient Representation Learning in Large-Scale Graph (Yeh, et al. 2022)](https://arxiv.org/pdf/2208.05648)
 - [SemDeDup: Data-efficient learning at web-scale through semantic deduplication (Abbas, et al. 2023)](https://arxiv.org/pdf/2303.09540)
 - [Hierarchical Sparse Subspace Clustering (HESSC): An Automatic Approach for Hyperspectral Image Analysis (Shahi, et al. 2020)](https://www.mdpi.com/2072-4292/12/15/2421)
+- [The RefinedWeb Dataset for Falcon LLM: Outperforming Curated Corpora with Web Data, and Web Data Only (Penedo, et al. 2023)](https://arxiv.org/abs/2306.01116)
+- [Locality Sensitive Hashing (LSH): The Illustrated Guide (pinecone.io)](https://www.pinecone.io/learn/series/faiss/locality-sensitive-hashing/)
+- [Hashing for Similarity Search: A Survey (Wang, et al. 2014)](https://arxiv.org/pdf/1408.2927)
