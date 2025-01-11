@@ -149,13 +149,13 @@ def training():
         gradient_accumulation_steps=(total_batch // batch_size // device_count), # Achieve a batch size of 1024
         learning_rate=6e-4,              # Default Pythia 160M
         weight_decay=0.01,               # Default Pythia 160M
-        max_steps=1024,                  # Adjusted for MiniPile (https://discuss.huggingface.co/t/how-does-max-steps-affect-the-number-of-samples-the-model-sees/69681)
-        warmup_steps=int(0.01 * 1024),   # 1% of total steps for warmup
+        max_steps=916,                   # Adjusted for MiniPile (https://discuss.huggingface.co/t/how-does-max-steps-affect-the-number-of-samples-the-model-sees/69681)
+        warmup_steps=int(0.01 * 916),    # 1% of total steps for warmup
         logging_dir=log_dir,
         logging_steps=10,
         eval_strategy="steps",
         eval_steps=100,     # Frequency for evaluation during training
-        save_steps=1024,    # Save at the end of training
+        save_steps=916,     # Save at the end of training
         save_total_limit=1, # Only keep the most recent checkpoint
         fp16=True,          # Using mixed precision for comparable conditions
         report_to=None,     # Noting this for later iterations, maybe set this as "wandb", "tensorboard" or smth
