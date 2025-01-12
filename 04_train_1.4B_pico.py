@@ -71,16 +71,16 @@ def training():
 
     minipile_train = load_dataset("parquet",
                                   data_files={
-                                      "train": str(base_path / "MiniPile_DensityProportioned" / "minipile_DensityProportioned_train_shard_*.parquet"),
+                                      "train": str(base_path / "MiniPile_DensityPico" / "minipile_DensityPico_train_shard_*.parquet"),
                                   },
-                                  cache_dir=str(base_path / "MiniPile_DensityProportioned_Cache"),
+                                  cache_dir=str(base_path / "MiniPile_DensityPico_Cache"),
                                   split="train")
 
     minipile_val = load_dataset("parquet",
                                 data_files={
-                                    "validation": str(base_path / "MiniPile_DensityProportioned" / "minipile_DensityProportioned_validation_shard_*.parquet"),
+                                    "validation": str(base_path / "MiniPile_DensityPico" / "minipile_DensityPico_validation_shard_*.parquet"),
                                 },
-                                cache_dir=str(base_path / "MiniPile_DensityProportioned_Cache"),
+                                cache_dir=str(base_path / "MiniPile_DensityPico_Cache"),
                                 split="validation")
 
     tokenizer = AutoTokenizer.from_pretrained(base_path / "pythia1.4b_dedup_untrained", use_fast=True, local_files_only=True)
@@ -99,14 +99,14 @@ def training():
                          return_special_tokens_mask=True)
 
     # I deleted old iterations of this folder before running this script for first time
-    if os.path.exists(base_path / "minipile_DensityProportioned_train_tokenized"):
-        minipile_train_tokenized = load_dataset("arrow", data_files=str(base_path / "minipile_DensityProportioned_train_tokenized/*.arrow"), split="train")
-        minipile_val_tokenized = load_dataset("arrow", data_files=str(base_path / "minipile_DensityProportioned_val_tokenized/*.arrow"), split="train")
+    if os.path.exists(base_path / "minipile_DensityPico_train_tokenized"):
+        minipile_train_tokenized = load_dataset("arrow", data_files=str(base_path / "minipile_DensityPico_train_tokenized/*.arrow"), split="train")
+        minipile_val_tokenized = load_dataset("arrow", data_files=str(base_path / "minipile_DensityPico_val_tokenized/*.arrow"), split="train")
     else:
         minipile_train_tokenized = minipile_train.map(tokenize, batched=True, remove_columns=minipile_train.column_names) # retain only new fields from tokenization
         minipile_val_tokenized = minipile_val.map(tokenize, batched=True, remove_columns=minipile_val.column_names)
-        minipile_train_tokenized.save_to_disk(base_path / "minipile_DensityProportioned_train_tokenized")
-        minipile_val_tokenized.save_to_disk(base_path / "minipile_DensityProportioned_val_tokenized")
+        minipile_train_tokenized.save_to_disk(base_path / "minipile_DensityPico_train_tokenized")
+        minipile_val_tokenized.save_to_disk(base_path / "minipile_DensityPico_val_tokenized")
 
     batch_size = 2 #4 #8 is too much for 3x A100
     total_batch = 1024
@@ -135,8 +135,8 @@ def training():
     else:
         print("No CUDA-capable GPUs available")
 
-    output_dir = str(base_path / "pythia1.4b_minipile_DensityProportioned_trained")
-    log_dir = str(base_path / "1.4b_minipile_DensityProportioned_logs")
+    output_dir = str(base_path / "pythia1.4b_minipile_DensityPico_trained")
+    log_dir = str(base_path / "1.4b_minipile_DensityPico_logs")
     os.makedirs(output_dir, exist_ok=True)
     os.makedirs(log_dir, exist_ok=True)
 
@@ -150,13 +150,11 @@ def training():
         gradient_accumulation_steps=(total_batch // batch_size // device_count), # Achieve a batch size of 1024
         learning_rate=2e-4,              # Default Pythia 1.4B-specific
         weight_decay=0.01,               # Default Pythia 160M and 1.4B
-        max_steps=1024,                  # Adjusted for MiniPile (https://discuss.huggingface.co/t/how-does-max-steps-affect-the-number-of-samples-the-model-sees/69681)
-        warmup_steps=int(0.01 * 1024),   # 1% of total steps for warmup
+        warmup_steps=int(0.01 * 366),    # 1% of total steps for warmup
         logging_dir=log_dir,
         logging_steps=10,
         eval_strategy="steps",
         eval_steps=100,     # Frequency for evaluation during training
-        save_steps=1024,    # Save at the end of training
         save_total_limit=1, # Only keep the most recent checkpoint
         fp16=True,          # Using mixed precision for comparable conditions
         report_to=None,     # Noting this for later iterations, maybe set this as "wandb", "tensorboard" or smth
@@ -192,18 +190,18 @@ def training():
     trainer.train()
 
     # Why is this a two-step process?!
-    trainer.save_model(str(base_path / "pythia1.4b_minipile_DensityProportioned_trained")) # This saves the model weights
+    trainer.save_model(str(base_path / "pythia1.4b_minipile_DensityPico_trained")) # This saves the model weights
 
 if __name__ == "__main__":
     training()
 
-# tmux new -s 14b_minipile_density
+# tmux new -s 14b_minipile_pico
 # conda activate minipile
-# torchrun --nproc_per_node=4 04_train_1.4B_density.py
-# I ran with CUDA_VISIBLE_DEVICES=0,1,2 torchrun --nproc_per_node=3 04_train_1.4B_density.py
+# torchrun --nproc_per_node=4 04_train_1.4B_pico.py
+# I ran with CUDA_VISIBLE_DEVICES=0,2 torchrun --nproc_per_node=2 04_train_1.4B_pico.py
 # Detach from tmux session: Ctrl-b followed by d
-# Reattach to tmux session: tmux attach -t 14b_minipile_density
+# Reattach to tmux session: tmux attach -t 14b_minipile_pico
 # tmux list-sessions
-# tmux kill-session -t 14b_minipile_density
+# tmux kill-session -t 14b_minipile_pico
 #
 # 

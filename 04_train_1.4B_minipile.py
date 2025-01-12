@@ -71,16 +71,16 @@ def training():
 
     minipile_train = load_dataset("parquet",
                                   data_files={
-                                      "train": str(base_path / "MiniPile_DensityProportioned" / "minipile_DensityProportioned_train_shard_*.parquet"),
+                                      "train": str(base_path / "MiniPile" / "data/train-*.parquet"),
                                   },
-                                  cache_dir=str(base_path / "MiniPile_DensityProportioned_Cache"),
+                                  cache_dir=str(base_path / "MiniPile_Cache"),
                                   split="train")
 
     minipile_val = load_dataset("parquet",
                                 data_files={
-                                    "validation": str(base_path / "MiniPile_DensityProportioned" / "minipile_DensityProportioned_validation_shard_*.parquet"),
+                                    "validation": str(base_path / "MiniPile" / "data/validation-*.parquet"),
                                 },
-                                cache_dir=str(base_path / "MiniPile_DensityProportioned_Cache"),
+                                cache_dir=str(base_path / "MiniPile_Cache"),
                                 split="validation")
 
     tokenizer = AutoTokenizer.from_pretrained(base_path / "pythia1.4b_dedup_untrained", use_fast=True, local_files_only=True)
@@ -99,14 +99,14 @@ def training():
                          return_special_tokens_mask=True)
 
     # I deleted old iterations of this folder before running this script for first time
-    if os.path.exists(base_path / "minipile_DensityProportioned_train_tokenized"):
-        minipile_train_tokenized = load_dataset("arrow", data_files=str(base_path / "minipile_DensityProportioned_train_tokenized/*.arrow"), split="train")
-        minipile_val_tokenized = load_dataset("arrow", data_files=str(base_path / "minipile_DensityProportioned_val_tokenized/*.arrow"), split="train")
+    if os.path.exists(base_path / "minipile_train_tokenized"):
+        minipile_train_tokenized = load_dataset("arrow", data_files=str(base_path / "minipile_train_tokenized/*.arrow"), split="train")
+        minipile_val_tokenized = load_dataset("arrow", data_files=str(base_path / "minipile_val_tokenized/*.arrow"), split="train")
     else:
         minipile_train_tokenized = minipile_train.map(tokenize, batched=True, remove_columns=minipile_train.column_names) # retain only new fields from tokenization
         minipile_val_tokenized = minipile_val.map(tokenize, batched=True, remove_columns=minipile_val.column_names)
-        minipile_train_tokenized.save_to_disk(base_path / "minipile_DensityProportioned_train_tokenized")
-        minipile_val_tokenized.save_to_disk(base_path / "minipile_DensityProportioned_val_tokenized")
+        minipile_train_tokenized.save_to_disk(base_path / "minipile_train_tokenized")
+        minipile_val_tokenized.save_to_disk(base_path / "minipile_val_tokenized")
 
     batch_size = 2 #4 #8 is too much for 3x A100
     total_batch = 1024
@@ -135,8 +135,8 @@ def training():
     else:
         print("No CUDA-capable GPUs available")
 
-    output_dir = str(base_path / "pythia1.4b_minipile_DensityProportioned_trained")
-    log_dir = str(base_path / "1.4b_minipile_DensityProportioned_logs")
+    output_dir = str(base_path / "pythia1.4b_minipile_trained")
+    log_dir = str(base_path / "1.4b_minipile_logs")
     os.makedirs(output_dir, exist_ok=True)
     os.makedirs(log_dir, exist_ok=True)
 
@@ -192,18 +192,17 @@ def training():
     trainer.train()
 
     # Why is this a two-step process?!
-    trainer.save_model(str(base_path / "pythia1.4b_minipile_DensityProportioned_trained")) # This saves the model weights
+    trainer.save_model(str(base_path / "pythia1.4b_minipile_trained")) # This saves the model weights
 
 if __name__ == "__main__":
     training()
+    torch.cuda.empty_cache()
 
-# tmux new -s 14b_minipile_density
+# tmux new -s 14b_minipile
 # conda activate minipile
-# torchrun --nproc_per_node=4 04_train_1.4B_density.py
-# I ran with CUDA_VISIBLE_DEVICES=0,1,2 torchrun --nproc_per_node=3 04_train_1.4B_density.py
 # Detach from tmux session: Ctrl-b followed by d
-# Reattach to tmux session: tmux attach -t 14b_minipile_density
+# Reattach to tmux session: tmux attach -t 14b_minipile
 # tmux list-sessions
-# tmux kill-session -t 14b_minipile_density
+# tmux kill-session -t 14b_minipile
 #
 # 
