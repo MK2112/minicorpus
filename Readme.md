@@ -37,6 +37,21 @@ Jupyter Notebooks are added for each chapter for documentation and to guide you 
     - The guide is available in the Jupyter Notebook `02_eval_160M.ipynb`.
 - Chapter `03` is concerned with reproducing MiniPile from scratch. This includes embedding The Pile Deduplicated, clustering the embeddings, and sampling a MiniPile from the clusters in accordance with the [original paper](https://arxiv.org/abs/2304.08442).
 
+The reproduction of MiniPile was successful. However, our reproduction had to make multiple assumptions and compromises:
+1. Embedding with E5-Large was replaced with E4-Base-4k, which was smaller and faster, but reported to perform worse than E5-Large representation-wise. We addressed this by raising the context size from 512 tokens to 1024 tokens.
+2. Step count for learning rate scheduling was not reported, but was scaled to 1024 based on the original dataset's size, intending a most immediate comparability.
+3. Cluster exclusion was done manually, as per paper, and while we found and excluded the exact same amount of clusters and the same clusters listed as examples, differences in cluster selection might have occured.
+
+While it wasn't intended, the reproduction dataset showed improvements regarding the perplexity scores on the Lambada (Standard + OpenAI) benchmarks, HellaSwag and ARC-Challenge of up to 2.23%.
+
+## Benchmark Results
+
+![](./img/160m_benchmark_results.png)
+
+![](./img/160m_ablation_benchmark_results.png)
+
+![](./img/1.4b_benchmark_results.png)
+
 ## Improving the MiniPile Pipeline, Practically
 
 The MiniPile pipeline can be improved by sampling a data subset that is ideally even smaller than MiniPile and yet more representative of the original Pile Deduplicated.<br>
@@ -58,27 +73,13 @@ We deem the `Size-Density-Proportionate Sampling` (Idea 3) as the most impactful
 Even the downsized versions of the dataset are at least equal to MiniPile on all but the MMLU benchmarks.<br>
 We even see the reduced (Idea 8) improve its performance on the Lambada (Standard) benchmark to 53% better perplexity than MiniPile.
 
-## Benchmark Results
-
-![](./img/160m_benchmark_results.png)
-
-![](./img/160m_ablation_benchmark_results.png)
-
-![](./img/1.4b_benchmark_results.png)
-
-
 ## Interpretation on practical improvements
 
 With this study project, we successfully replicated the MiniPile pipeline, produced a reproduction dataset and attempted several ideas for improvement of the distillation pipeline, which we then compared primarily by training on the 160M Pythia model architecture.
 
 ### Reproduction Challenges and Insights
 
-The reproduction of MiniPile was successful. However, our reproduction had to make multiple assumptions and compromises:
-1. Embedding with E5-Large was replaced with E4-Base-4k, which was smaller and faster, but reported to perform worse than E5-Large representation-wise. We addressed this by raising the context size from 512 tokens to 1024 tokens.
-2. Step count for learning rate scheduling was not reported, but was scaled to 1024 based on the original dataset's size, intending a most immediate comparability.
-3. Cluster exclusion was done manually, as per paper, and while we found and excluded the exact same amount of clusters and the same clusters listed as examples, differences in cluster selection might have occured.
-
-While it wasn't intended, the reproduction dataset showed improvements regarding the perplexity scores on the Lambada (Standard + OpenAI) benchmarks, HellaSwag and ARC-Challenge of up to 2.23%. We consider this to be within the margin of error and therefore not significant.
+The reproduction of MiniPile was successful. Even though the reproduction had to make multiple assumptions and compromises, benchmark performance was largely retained or even slightly improved upon (within a single digit percentage range <= 2.23%). We consider this to be within the margin of error and therefore not significant.
 
 ### 160M Benchmark Insights
 
