@@ -44,6 +44,25 @@ The reproduction of MiniPile was successful. However, our reproduction had to ma
 
 While it wasn't intended, the reproduction dataset showed improvements regarding the perplexity scores on the Lambada (Standard + OpenAI) benchmarks, HellaSwag and ARC-Challenge of up to 2.23%.
 
+## Improving the MiniPile Pipeline, Practically
+
+The MiniPile pipeline can be improved by sampling a data subset that is ideally even smaller than MiniPile and yet more representative of the original Pile Deduplicated.<br>
+Ultimately resulting in success, several attempts were undertaken to improve the MiniPile pipeline for these objectives.<br>
+All ideas are documented in the fourth chapter's Jupyter Notebook `04_improve_minipile.ipynb`:
+
+1. Cluster-Proportionate Sampling (`04_distill_pile_embed_idea_1_proportionate.py`)
+2. Hybrid Loss-Based Sampling (`04_distill_pile_embed_idea_2_lossi_1.py` and `04_distill_pile_embed_idea_2_lossi_2.py`)
+3. Size-Density-Proportionate Sampling (`04_distill_pile_embed_idea_3_density.py`)<br>
+3.1. Low-Density-Proportionate Sampling (`04_distill_pile_embed_idea_3.1_density_low.py`)
+4. Higher-Resolution Clustering (`04_cluster_pile_embed_idea_4_double.py`, `04_distill_pile_embed_idea_4_k440.py`)
+5. Higher-Resolution Clustering and Size-Density-Proportionate Sampling (`04_distill_pile_embed_idea_5_k440_density.py`)
+6. Inter-Intra-Cluster Sampling with High Clustering Resolution (`04_distill_pile_embed_idea_6_inter.py`)<br>
+6.1. Inter-Intra-Cluster Sampling with Inter-Cluster Diversity Weighting Increased (`04_distill_pile_embed_idea_6.1_inter_high.py`)
+7. Down-Sized Size-Density-Proportionate Sampling (`04_distill_pile_embed_idea_7_density-tiny.py`, `04_distill_pile_embed_idea_7_density-nano.py` and `04_distill_pile_embed_idea_7_density-pico.py`)
+
+Benchmark results are available below.<br>
+We deem the `Size-Density-Proportionate Sampling` (Idea 3) as the most impactful, as it is the most representative of the original Pile Deduplicated while being smaller in example count than MiniPile. Strongest improvements were observed on the Lambada (Std) benchmark with an improvement of over 50% in perplexity. This approach was further used in (Ideas 7, 8, 9) to reduce the distilled, density-sampled dataset size to 90% (Idea 7) of the dataset created in (Idea 3), and $75\%$ (Idea 8) as well as $25\%$ (Idea 9) of the original MiniPile, respectively.<br>
+
 ## Benchmark Results
 
 Detailed resulkts can be found in the [benchmarks](./benchmarks/) folder.<br>
@@ -84,26 +103,6 @@ LaTeX-versions of the below tables can be found in the [benchmark_results.pdf](.
 | 160M Density 2 Epochs       | 0.189              | 0.012                  | 0.230      | 0.004         | 0.257           | 0.004             | 0.501            | 0.014              | 0.000                   | 0.000                     | 1587737.376                 | 121555.315                | 0.538       | 0.002          | 0.000               | 0.000                  | 8366924.760                 | 713077.358              |
 | 160M Density Pico 2 Epochs  | 0.193              | 0.012                  | 0.230      | 0.004         | 0.257           | 0.004             | 0.493            | 0.014              | 0.000                   | 0.000                     | 2017680.705                 | 159090.061                | 0.541       | 0.002          | 0.000               | 0.000                  | 10465698.688                | 903166.520              |
 
-## Improving the MiniPile Pipeline, Practically
-
-The MiniPile pipeline can be improved by sampling a data subset that is ideally even smaller than MiniPile and yet more representative of the original Pile Deduplicated.<br>
-Ultimately resulting in success, several attempts were undertaken to improve the MiniPile pipeline for these objectives.<br>
-All ideas are documented in the fourth chapter's Jupyter Notebook `04_improve_minipile.ipynb`:
-
-1. Cluster-Proportionate Sampling (`04_distill_pile_embed_idea_1_proportionate.py`)
-2. Hybrid Loss-Based Sampling (`04_distill_pile_embed_idea_2_lossi_1.py` and `04_distill_pile_embed_idea_2_lossi_2.py`)
-3. Size-Density-Proportionate Sampling (`04_distill_pile_embed_idea_3_density.py`)<br>
-3.1. Low-Density-Proportionate Sampling (`04_distill_pile_embed_idea_3.1_density_low.py`)
-4. Higher-Resolution Clustering (`04_cluster_pile_embed_idea_4_double.py`, `04_distill_pile_embed_idea_4_k440.py`)
-5. Higher-Resolution Clustering and Size-Density-Proportionate Sampling (`04_distill_pile_embed_idea_5_k440_density.py`)
-6. Inter-Intra-Cluster Sampling with High Clustering Resolution (`04_distill_pile_embed_idea_6_inter.py`)<br>
-6.1. Inter-Intra-Cluster Sampling with Inter-Cluster Diversity Weighting Increased (`04_distill_pile_embed_idea_6.1_inter_high.py`)
-7. Down-Sized Size-Density-Proportionate Sampling (`04_distill_pile_embed_idea_7_density-tiny.py`, `04_distill_pile_embed_idea_7_density-nano.py` and `04_distill_pile_embed_idea_7_density-pico.py`)
-
-Benchmark results for each attempt are available in the fourth chapter's Jupyter Notebook and in the [benchmarks](./benchmarks/) folder.<br>
-We deem the `Size-Density-Proportionate Sampling` (Idea 3) as the most impactful, as it is the most representative of the original Pile Deduplicated while being smaller in example count than MiniPile. Strongest improvements were observed on the Lambada (Std) benchmark with an improvement of over 50% in perplexity. This approach was further used in (Ideas 7, 8, 9) to reduce the distilled, density-sampled dataset size to 90% (Idea 7) of the dataset created in (Idea 3), and $75\%$ (Idea 8) as well as $25\%$ (Idea 9) of the original MiniPile, respectively.<br>
-Even the downsized versions of the dataset are at least equal to MiniPile on all but the MMLU benchmarks.<br>
-We even see the reduced (Idea 8) improve its performance on the Lambada (Standard) benchmark to 53% better perplexity than MiniPile.
 
 ## Interpretation on practical improvements
 
