@@ -15,13 +15,13 @@ MiniCorpus covers the following steps:
 
 ## Quick Guide: Build your own MiniPile
 
-Every script in this respository has the instructions on how to run it at the bottom.
+Every script in this respository has the instructions on how to run it at the end of the script.
 
 1. Download [The Pile Deduplicated](https://huggingface.co/datasets/EleutherAI/the_pile_deduplicated) from HuggingFace, e.g. by using `01_get_piles.ipynb`.
-2. Embed the deduplicated Pile using `03_embed_pile_dedup_turbo.py`.
-3. Right when `03_embed_pile_dedup_turbo.py` starts processing, run `03_cluster_pile_embed.py` to cluster the embeddings. The clustering script was built to run fitting of k-Means in parallel with the embedding script producing new embeddings.
+2. Embed the Pile Deduplicated using `03_embed_pile_dedup_turbo.py`.
+3. Right when `03_embed_pile_dedup_turbo.py` starts processing, run `03_cluster_pile_embed.py` to cluster the embeddings. The clustering script was built to run the fitting of k-Means in parallel with the embedding script producing new embeddings.
 4. After the embedding script finishes, `03_cluster_pile_embed.py` will store the centroids and automatically start clustering the embeddings.
-5. Once clustering concluded, you may inspect the generated `cluster_info_for_inspection.json` in the `MiniPile_BatchKMeans` folder for manual cluster inspection and exclusion.
+5. Once clustering concluded, you may inspect the generated `cluster_info_for_inspection.json` in the `MiniPile_BatchKMeans` folder for manual cluster exclusion.
 6. Run `03_sort_pile_clusters.py` to have the clustered embeddings sorted by their assigned cluster into dedicated `jsonl` files.
 7. Run `03_distill_pile_embed.py` or either of the `04_distill_pile_embed_*.py` scripts to sample a flavor of MiniPile from the embedded Pile.
 8. (Optional) Run `03_train_160M_*.py` or `03_train_1.4B_*.py` or either of the `04_train_160M_*.py` or `04_train_1.4B_*.py` to train a model on your chosen MiniPile flavor. You may need to uncomment the download function inside the training script to have it download the untrained base model first.
@@ -31,20 +31,19 @@ Every script in this respository has the instructions on how to run it at the bo
 
 The reproduction process is split across three chapters.<br>
 Files belonging to these chapters are prefixed with `01_`, `02_`, and `03_` respectively.<br>
-Jupyter Notebooks are added for each chapter for documentation and to guide you through the process.
+Jupyter Notebooks are added for each chapter for documentation and guidance.
 
 - Chapter `01` is concerned with downloading The Pile Deduplicated and the original MiniPile (for comparison). Be sure to have enough disk space available.
     - The guide is available in the Jupyter Notebook `01_get_piles.ipynb`.
-- Chapter `02` is concerned with training a [Pythia](https://arxiv.org/abs/2304.01373) [160M](https://huggingface.co/EleutherAI/pythia-160m) model on the original MiniPile and benchmarking it with the [EleutherAI LM Evaluation Harness](https://github.com/EleutherAI/lm-evaluation-harness). 
+- Chapter `02` regards training a [Pythia](https://arxiv.org/abs/2304.01373) [160M](https://huggingface.co/EleutherAI/pythia-160m) model on the original MiniPile and benchmarking it with the [EleutherAI LM Evaluation Harness](https://github.com/EleutherAI/lm-evaluation-harness). 
     - The guide is available in the Jupyter Notebook `02_eval_160M.ipynb`.
-- Chapter `03` is concerned with reproducing MiniPile from scratch. This includes embedding The Pile Deduplicated, clustering the embeddings, and sampling a MiniPile from the clusters in accordance with the [original paper](https://arxiv.org/abs/2304.08442).
+- Chapter `03` is about reproducing MiniPile from scratch. This includes embedding The Pile Deduplicated, clustering the embeddings, and sampling a MiniPile from the clusters in accordance with the [original paper](https://arxiv.org/abs/2304.08442).
 
-The reproduction of MiniPile was successful. However, our reproduction had to make multiple assumptions and compromises:
-1. Embedding with E5-Large was replaced with E4-Base-4k, which was smaller and faster, but reported to perform worse than E5-Large representation-wise. We addressed this by raising the context size from 512 tokens to 1024 tokens.
-2. Step count for learning rate scheduling was not reported, but was scaled to 1024 based on the original dataset's size, intending a most immediate comparability.
-3. Cluster exclusion was done manually, as per paper, and while we found and excluded the exact same amount of clusters and the same clusters listed as examples, differences in cluster selection might have occured.
+The reproduction of MiniPile was successful. However, our reproduction had to make compromises:
+1. Embedding with E5-Large was replaced with E4-Base-4k, which was smaller and faster, but reported to perform worse than E5-Large representation-wise. We addressed this by raising the context window from 512 tokens to 1024 tokens.
+2. Cluster exclusion was done manually, as per paper, and while we found and excluded the exact same amount of clusters and the same clusters described as examples, differences in cluster selection may have occured.
 
-While it wasn't intended, the reproduction dataset showed improvements regarding the perplexity scores on the Lambada (Standard + OpenAI) benchmarks, HellaSwag and ARC-Challenge of up to 2.23%.
+The reproduction dataset showed improvements, and therefore deviations, regarding the perplexity scores on the Lambada (Standard + OpenAI) benchmarks, HellaSwag and ARC-Challenge of at most 2.23%.
 
 ## Improving the MiniPile Pipeline, Practically
 
@@ -63,12 +62,23 @@ All ideas are documented in the fourth chapter's Jupyter Notebook `04_improve_mi
 7. Down-Sized Size-Density-Proportionate Sampling (`04_distill_pile_embed_idea_7_density-tiny.py`, `04_distill_pile_embed_idea_7_density-nano.py` and `04_distill_pile_embed_idea_7_density-pico.py`)
 
 Benchmark results are available below.<br>
-We deem the `Size-Density-Proportionate Sampling` (Idea 3) as the most impactful, as it is the most representative of the original Pile Deduplicated while being smaller in example count than MiniPile. Strongest improvements were observed on the Lambada (Std) benchmark with an improvement of over 50% in perplexity. This approach was further used in (Ideas 7, 8, 9) to reduce the distilled, density-sampled dataset size to 90% (Idea 7) of the dataset created in (Idea 3), and $75\%$ (Idea 8) as well as $25\%$ (Idea 9) of the original MiniPile, respectively.<br>
+We deem the `Size-Density-Proportionate Sampling` (Idea 3) the most impactful, as it is the most representative of the original Pile Deduplicated while being smaller in example count than MiniPile. Strongest improvements were observed on the Lambada (Std) benchmark with an improvement of over 50% in perplexity. This approach was further used in (Ideas 7, 8, 9) to reduce the distilled, density-sampled dataset size to 90% (Idea 7) of the dataset created in (Idea 3), and then 75% (Idea 8) as well as 25% (Idea 9) of the original MiniPile, respectively.
+
+### Size-Density-Proportionate Sampling
+
+Like the other ideas too, this improvement idea and its inception are extensively documented in `04_improve_minipile.ipynb`. A brief summary: 
+
+Size-density-proportionate sampling is a specific setting that emerged from the density-based sampling idea that calculates cluster contribution proportions like so:
+
+$$\text{Cluster Proportion} = (|C_i|) / (|\bigcup_{j} C_j|) \cdot (1 - \omega \cdot \rho(C_i))$$
+
+Here, $|C_i|$ is the number of documents in cluster $i$, $|\bigcup_{j} C_j|$ is the total number of documents in all clusters, and $\rho(C_i)$ is the density of cluster $i$. The impact of the density is scaled by the hyperparameter $\omega$, intended to reduce the factor of over-representation of thoroughly sparse clusters.<br>
+For size-density-proportionate sampling, we set $\omega = 0.5$ with the intention of having neither cluster size nor density completely dominate the proportion calculation.
 
 ## Benchmark Results
 
-Detailed resulkts can be found in the [benchmarks](./benchmarks/) folder.<br>
-Benchmark comparisons were documented in the [MiniPile_Pile_Benchmark_Comparisons](./MiniPile_Pile_Benchmark_Comparisons.ods) spreadsheet.<br>
+Detailed results can be found in the [benchmarks](./benchmarks/) folder.<br>
+Benchmark comparisons were additionally documented in the [MiniPile_Pile_Benchmark_Comparisons](./MiniPile_Pile_Benchmark_Comparisons.ods) spreadsheet.<br>
 LaTeX-versions of the below tables can be found in the [benchmark_results.pdf](./img/benchmark_results.pdf) (markdown tables below for readability).
 
 ### Pythia 160M models
@@ -112,18 +122,18 @@ With this study project, we successfully replicated the MiniPile pipeline, produ
 
 ### Reproduction Challenges and Insights
 
-The reproduction of MiniPile was successful. Even though the reproduction had to make multiple assumptions and compromises, benchmark performance was largely retained or even slightly improved upon (within a single digit percentage range <= 2.23%). We consider this to be within the margin of error and therefore not significant.
+Even though the reproduction had to make assumptions and compromises, benchmark performance was largely retained or even slightly improved (within a single digit percentage range, <= 2.23%). We consider this to be within the margin of error and therefore not a significant deviation. The reproduction of MiniPile was therefore successful.
 
 ### 160M Benchmark Insights
 
 Excluding the model versions pre-trained on The Pile, the project produced a Pythia 160M and a Pythia 1.4B trained on the original MiniPile as baselines.<br>
-Additionally the project produced 6 160M parameter models exploring ideas for improvement and another 7 160M ablation models, concerning scaling effects of distillation parameters, the distillation dataset size and the training step count. An additional 3 1.4B parameter models were trained with the reproduction MiniPile, the most promising distillation candidate and the lowest example count distillation dataset. A total of 14 datasets has been released in context with the project and released on [HuggingFace](https://huggingface.co/Marcus2112), along with all trained models. (Individual links to models and datasets are listed further below.)
+Additionally the project produced six 160M parameter models exploring distinct ideas for improvement and another seven 160M ablation models, concerning investigations of scaling effects of distillation parameters, the distillation dataset size and the training step count. An additional three 1.4B parameter models were trained with the reproduction MiniPile, the most promising distillation candidate (size-density-weighted sampling) and the lowest example count distillation dataset, respectively. A total of 14 datasets has been released on [HuggingFace](https://huggingface.co/Marcus2112), along with all trained models. (Individual links to models and datasets are listed further below.)
 
 For the 160M model benchmarks, we see that all of the 'improved' MiniPile model variants maintain similar MMLU performance (0.230), undercutting the original MiniPile (0.270) slightly. WinoGrande shows high consistency across MiniPile model variants, too. Compared to the Pile-trained model, every MiniPile model variant indicates catastrophic failure on both versions of Lambada, with perplexity scores in the millions. However, Blimp scores show only moderate degradation from the Pile-trained baseline, indicating a high retention of reasoning capabilities.
 
 The 160M MiniPile base version shows highest MMLU (0.270) and competitive ARC-Challenge scores (0.213), while 160M Density shows best WinoGrande (0.520) and solid Blimp (0.550) scores, and at the same time being approx. 6% smaller in training example count compared to MiniPile.
 
-Of the attempted improvements, the Low Density version shows overall lowest scores, beating the reproduction only slightly in the Blimp benchmark.
+Of the attempted improvements, the "Low Density" version shows overall lowest scores, beating the reproduction only slightly in the Blimp benchmark.
 This implies that it is important to sufficiently capture dense, similar regions of data instead of overly prefering sparse, unique example regions.
 
 When only seeing these 160M results, one could interpret that:
