@@ -9,9 +9,11 @@ MiniCorpus covers the following steps:
 
 ## Project Setup
 
-Create the project's conda environment using: `conda env create -f minicorpus.yaml`.
+1. Install Python 3.12.7
+2. Install Anaconda
+3. Create the project's Conda environment using: `conda env create -f minicorpus.yaml`.
 
-### Quick Guide: Build your own MiniPile
+## Quick Guide: Build your own MiniPile
 
 Every script in this respository has the instructions on how to run it at the bottom.
 
