@@ -68,12 +68,12 @@ We deem the `Size-Density-Proportionate Sampling` (Idea 3) the most impactful, a
 
 Like the other ideas too, this improvement idea and its inception are extensively documented in `04_improve_minipile.ipynb`. A brief summary: 
 
-Size-density-proportionate sampling is a specific setting that emerged from the density-based sampling idea that calculates cluster contribution proportions like so:
+Size-density-proportionate sampling is a specific setting that emerged from the density-based sampling idea that calculates cluster contribution proportions to the distilled target dataset like so:
 
-$$\text{Cluster Proportion} = (|C_i|) / (|\bigcup_{j} C_j|) \cdot (1 - \omega \cdot \rho(C_i))$$
+![](./img/density.png)
 
-Here, $|C_i|$ is the number of documents in cluster $i$, $|\bigcup_{j} C_j|$ is the total number of documents in all clusters, and $\rho(C_i)$ is the density of cluster $i$. The impact of the density is scaled by the hyperparameter $\omega$, intended to reduce the factor of over-representation of thoroughly sparse clusters.<br>
-For size-density-proportionate sampling, we set $\omega = 0.5$ with the intention of having neither cluster size nor density completely dominate the proportion calculation.
+Here, $|C_i|$ is the number of documents in cluster $i$, $|\bigcup_{j} C_j|$ is the total number of documents in all non-excluded clusters, and $\rho(C_i)$ is the density of cluster $i$. The impact of the density is scaled by the hyperparameter $\omega$ with the intention of now being able to reduce the risk of over-representation of overly sparse clusters over dense, still informative regions in the embedding space.<br>
+For size-density-proportionate sampling, we set $\omega = 0.5$ to have neither cluster size nor density dominate the proportion calculation.
 
 ## Benchmark Results
 
