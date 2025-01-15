@@ -76,10 +76,15 @@ Size-density-proportionate sampling is a specific setting applied to the density
 Here, $|C_i|$ is the number of documents in cluster $i$, $|\bigcup_{j} C_j|$ is the total number of documents in all non-excluded clusters, and $\rho(C_i)$ is the density of cluster $i$. Per cluster, the density is calculated by finding the distance from each data point in the cluster to the centroid, adding up all these distances and dividing the sum by the number of data points in the cluster. The impact of the density is scaled by the hyperparameter $\omega$ with the intention of allowing to reduce a risk of over-representation of overly sparse clusters compared to dense, yet still informative regions in the embedding space.<br>
 For size-density-proportionate sampling, we set $\omega = 0.5$ as weight of the density for the proportion calculation.
 
+#### Reasoning for this idea
+
+Density-proportionate sampling as a concept emphasizes regions with higher diversity, i.e. low-density areas with proportionally higher example counts. The idea was inspired by the concept of entropy in that these regions, when explicitly regarded, enable to provide deeper, richer insight into larger subspaces of the embedding space, and therefore allow to cover more of the embedding space, and hence the diversity of the text examples, in an ultimately smaller subset. Therefore, a penalty on high-density 'oversampling' is put in place through $\omega$ to reduce semantic redundancy in the sampled subset.<br>
+Over-emphasizing this penalty would however lead to a loss of information, as dense regions may be dense specifically because the region's semantic information being particularly important/informative and thus captured more often. For the particular approach of size-density-proportionate sampling, $\omega$ was set to 0.5 to have both dense, representative regions, as well as sparse, diverse regions, represented. Note that $\omega$ doesn't weigh one factor (size) against the other (density), and rather the density factor is scaled by $\omega$.
+
 ## Benchmark Results
 
 Detailed results can be found in the [benchmarks](./benchmarks/) folder.<br>
-Benchmark comparisons were additionally documented in the [MiniPile_Pile_Benchmark_Comparisons.ods](./MiniPile_Pile_Benchmark_Comparisons.ods) spreadsheet.<br>
+Benchmark comparisons were additionally documented in the [MiniPile_Pile_Benchmark_Comparisons.ods](./MiniPile_Pile_Benchmark_Comparisons.ods) spreadsheet, where more rigorous statistical analysis is also conducted.<br>
 LaTeX-versions of the below tables can be found in the [benchmark_results.pdf](./img/benchmark_results.pdf) (markdown tables below for readability).
 
 ### Pythia 160M models
@@ -95,15 +100,6 @@ LaTeX-versions of the below tables can be found in the [benchmark_results.pdf](.
 | 160M k440 Density       | 0.193              | 0.012                  | 0.230      | 0.004         | 0.260           | 0.004             | 0.494            | 0.014              | 0.000                   | 0.000                     | 2025523.777                 | 164221.889               | 0.552       | 0.002          | 0.000               | 0.000                  | 12959844.941               | 1160155.065             |
 | 160M k440 Inter         | 0.194              | 0.012                  | 0.230      | 0.004         | 0.261           | 0.004             | 0.500            | 0.014              | 0.000                   | 0.000                     | 1858348.205                 | 147853.142               | 0.551       | 0.002          | 0.000               | 0.000                  | 11655568.314               | 1032438.429             |
 
-### Pythia 1.4B models
-
-| Model                   | ARC-Challenge (acc) | ARC-Challenge (stddev) | MMLU (acc) | MMLU (stddev) | HellaSwag (acc) | HellaSwag (stddev) | WinoGrande (acc) | WinoGrande (stddev) | Lambada (OpenAI) (acc) | Lambada (OpenAI) (stddev) | Lambada (OpenAI) (perplexity) | Lambada (OpenAI) (stddev) | Blimp (acc) | Blimp (stddev) | Lambada (Std) (acc) | Lambada (Std) (stddev) | Lambada (Std) (perplexity) | Lambada (Std) (stddev) | ARC-Easy (acc) | ARC-Easy (stddev) |
-|-------------------------|---------------------|-------------------------|------------|---------------|-----------------|--------------------|------------------|---------------------|-------------------------|----------------------------|-----------------------------|---------------------------|-------------|----------------|---------------------|-------------------------|----------------------------|--------------------------|----------------|-------------------|
-| 1.4B Pile Dedup         | 0.260              | 0.013                  | 0.239      | 0.004         | 0.418           | 0.005             | 0.573            | 0.014              | 0.620                   | 0.007                     | 6.104                       | 0.153                     | 0.815       | 0.001          | 0.490               | 0.007                  | 11.245                     | 0.331                   | 0.617          | 0.010            |
-| 1.4B MiniPile           | 0.190              | 0.012                  | 0.230      | 0.004         | 0.258           | 0.004             | 0.519            | 0.014              | 0.000                   | 0.000                     | 1564928.526                 | 118691.457                | 0.548       | 0.002          | 0.000               | 0.000                  | 8848600.941                 | 745031.890              | 0.272          | 0.009            |
-| 1.4B Reproduction       | 0.193              | 0.012                  | 0.230      | 0.004         | 0.258           | 0.004             | 0.509            | 0.014              | 0.000                   | 0.000                     | 1520707.870                 | 115261.366                | 0.540       | 0.002          | 0.000               | 0.000                  | 8651201.888                 | 735161.524              | 0.267          | 0.009            |
-| 1.4B Density            | 0.185              | 0.011                  | 0.230      | 0.004         | 0.259           | 0.004             | 0.504            | 0.014              | 0.000                   | 0.000                     | 1420846.832                 | 106563.133                | 0.542       | 0.002          | 0.000               | 0.000                  | 7916035.353                 | 664805.918              | 0.270          | 0.009            |
-
 ### Pythia 160M ablation studies
 
 | Model                        | ARC-Challenge (acc) | ARC-Challenge (stddev) | MMLU (acc) | MMLU (stddev) | HellaSwag (acc) | HellaSwag (stddev) | WinoGrande (acc) | WinoGrande (stddev) | Lambada (OpenAI) (acc) | Lambada (OpenAI) (stddev) | Lambada (OpenAI) (perplexity) | Lambada (OpenAI) (stddev) | Blimp (acc) | Blimp (stddev) | Lambada (Std) (acc) | Lambada (Std) (stddev) | Lambada (Std) (perplexity) | Lambada (Std) (stddev) |
@@ -115,6 +111,16 @@ LaTeX-versions of the below tables can be found in the [benchmark_results.pdf](.
 | 160M Density Pico (250k)    | 0.190              | 0.012                  | 0.230      | 0.004         | 0.258           | 0.004             | 0.496            | 0.014              | 0.000                   | 0.000                     | 1964196.926                 | 153419.785                | 0.538       | 0.002          | 0.000               | 0.000                  | 10720344.552                | 925236.704              |
 | 160M Density 2 Epochs       | 0.189              | 0.012                  | 0.230      | 0.004         | 0.257           | 0.004             | 0.501            | 0.014              | 0.000                   | 0.000                     | 1587737.376                 | 121555.315                | 0.538       | 0.002          | 0.000               | 0.000                  | 8366924.760                 | 713077.358              |
 | 160M Density Pico 2 Epochs  | 0.193              | 0.012                  | 0.230      | 0.004         | 0.257           | 0.004             | 0.493            | 0.014              | 0.000                   | 0.000                     | 2017680.705                 | 159090.061                | 0.541       | 0.002          | 0.000               | 0.000                  | 10465698.688                | 903166.520              |
+
+### Pythia 1.4B models
+
+| Model                         | ARC-Challenge (Acc) | ARC-Challenge (Stddev) | MMLU (Acc) | MMLU (Stddev) | HellaSwag (Acc) | HellaSwag (Stddev) | WinoGrande (Acc) | WinoGrande (Stddev) | Lambada (OpenAI Acc) | Lambada (OpenAI Stddev) | Lambada (OpenAI Perplexity) | Lambada (OpenAI Perplexity Stddev) | Blimp (Acc) | Blimp (Stddev) | Lambada (Std Acc) | Lambada (Std Stddev) | Lambada (Std Perplexity) | Lambada (Std Perplexity Stddev) | ARC-Easy (Acc) | ARC-Easy (Stddev) |
+|-------------------------------|---------------------|-------------------------|------------|---------------|-----------------|---------------------|-------------------|-----------------------|------------------------|---------------------------|------------------------------|-----------------------------------|-------------|----------------|-------------------|----------------------|--------------------------|-------------------------------|---------------|-----------------|
+| 1.4B Pile Dedup           | 0.260               | 0.013                   | 0.239      | 0.004         | 0.418           | 0.005               | 0.573             | 0.014                 | 0.620                  | 0.007                     | 6.104                        | 0.153                             | 0.815       | 0.001          | 0.490             | 0.007                | 11.245                  | 0.331                         | 0.617         | 0.010           |
+| 1.4B MiniPile             | 0.190               | 0.012                   | 0.230      | 0.004         | 0.258           | 0.004               | 0.519             | 0.014                 | 0.000                  | 0.000                     | 1564928.526                  | 118691.457                       | 0.548       | 0.002          | 0.000             | 0.000                | 8848600.941             | 745031.890                    | 0.272         | 0.009           |
+| 1.4B Reproduction         | 0.193               | 0.012                   | 0.230      | 0.004         | 0.258           | 0.004               | 0.509             | 0.014                 | 0.000                  | 0.000                     | 1520707.870                  | 115261.366                       | 0.540       | 0.002          | 0.000             | 0.000                | 8651201.888             | 735161.524                    | 0.267         | 0.009           |
+| 1.4B Density              | 0.185               | 0.011                   | 0.230      | 0.004         | 0.259           | 0.004               | 0.504             | 0.014                 | 0.000                  | 0.000                     | 1420846.832                  | 106563.133                       | 0.542       | 0.002          | 0.000             | 0.000                | 7916035.353             | 664805.918                    | 0.270         | 0.009           |
+| 1.4B Density Pico (250k)  | 0.193               | 0.012                   | 0.230      | 0.004         | 0.260           | 0.004               | 0.512             | 0.014                 | 0.000                  | 0.000                     | 1662608.944                  | 128444.361                       | 0.545       | 0.002          | 0.000             | 0.000                | 8546578.183             | 737889.944                    | 0.276         | 0.009           |
 
 ## Interpretation on practical improvements
 
@@ -154,7 +160,28 @@ Pile Dedup 1.4B shows major improvements over Pile Dedup 160M across all metrics
 
 Ignoring the results for 1.4B Pythia for The Pile Deduplicated for a moment, we also see another effect: The performance differences between the different MiniPile versions diminish, with the density-based sampling approach not being a clear improvement at all anymore, but instead being marginally better only in HellaSwag and both Lambada perplexity scores.
 
-Therefore, other than the 160M benchmark results alone would let suggest, there exists a more distinct relationship between dataset size and model capacity when training parameter counts are scaled up. From that perspective, the MiniPile variants seem to be creating a "distilled" or "compressed" version of the Pile's knowledge that is particularly well-suited for smaller model capacities. 
+Therefore, other than the 160M benchmark results alone would let suggest, there exists a more distinct, complex relationship between dataset size and model capacity when training parameter counts are scaled up. From that perspective, the MiniPile variants seem to be creating a "distilled" or "compressed" version of the Pile's knowledge that is particularly well-suited for smaller model capacities.
+
+This was further investigated with with a training run on "MiniPile Density Pico", which produced surprising results:
+
+| Benchmark        | Measure    |     | 1.4B Density                   | 1.4B Density Pico          | Percentage Difference in Means |
+| ---------------- | ---------- | --- | ------------------------------ | -------------------------- | ------------------------------ |
+| ARC-Challenge    | acc        | ↑   | 0.1852 ± 0.0114                | **0.1928 ± 0.0115**        | 4.1037                         |
+| MMLU             | acc        | ↑   | 0.2295 ± 0.0035                | 0.2295 ± 0.0035            | 0.0000                         |
+| HellaSwag        | acc        | ↑   | 0.2589 ± 0.0044                | **0.2600 ± 0.0044**        | 0.4249                         |
+| WinoGrande       | acc        | ↑   | 0.5043 ± 0.0141                | **0.5122 ± 0.0140**        | 1.5665                         |
+| Lambada (OpenAI) | acc        | ↑   | 0.0000 ± 0.0000                | 0.0000 ± 0.0000            | -                              |
+| Lambada (OpenAI) | perplexity | ↓   | **1420846.8323 ± 106563.1327** | 1662608.9444 ± 128444.3607 | 17.0154                        |
+| Lambada (Std)    | acc        | ↑   | 0.0000 ± 0.0000                | 0.0000 ± 0.0000            | -                              |
+| Lambada (Std)    | perplexity | ↓   | **7916035.3527 ± 664805.9178** | 8543578.1832 ± 737889.9436 | 7.9654                         |
+| BLiMP            | acc        | ↑   | 0.5422 ± 0.0017                | **0.5445 ± 0.0017**        | 7.9654                         |
+| ARC-Easy         | acc        | ↑   | 0.2698 ± 0.0091                | **0.2761 ± 0.0091**        | 2.3351                         |
+
+The Density-based sampling approach's distillation size reduction not only shows competitive performance, but beats the original Density dataset in nearly all reasoning benchmarks, with a disproportionally low loss on the perplexity scores.<br>
+
+Even at 1.4B parameters, we can observe the size restriction act as a means of regularization: Essential knowledge transfer mechanisms remain intact, but at the cost of a reduced memorization capacity. Furthermore, there appears to be an optimal data-to-parameter ratio that balances feature extraction efficiency by the distillation, and memorization capacity and reasoning capability attainable by the model. This would allow for a possibility of tuning dataset size based on target application which could especially interesting for curriculum learning approaches.
+
+We conclude that the relationship between dataset size and model performance is not monotonic, as would be suggested by the 160M results alone. Instead, the results signal that complex, task-dependent optima are attainable with a lot less data than previously hypothesized with MiniPile. There must be attainable, optimal data-to-parameter ratios, and they seem to require less data than previously thought.
 
 With the 1.4B results, we have to revise the 160M result interpretations and have to hypothesize that:
 - The strong 160M MiniPile performances likely indicate a model-side capacity bound, rather than solely reflecting dataset efficiency
@@ -187,20 +214,23 @@ At 160M parameters, the models can effectively learn from this concentrated form
 
 ### Conclusion
 
-With a successful replication and several different improvement approaches explored, a best possible improvement was found with the [minipile_density-proportioned](https://huggingface.co/datasets/Marcus2112/minipile_density-proportioned). This dataset is smaller than MiniPile, but shows competitive performance on all benchmarks.
+With a successful replication and several different improvement approaches explored, a notable improvement was found with the [minipile_density-proportioned](https://huggingface.co/datasets/Marcus2112/minipile_density-proportioned) (Idea 3). This dataset is smaller than MiniPile, but shows competitive performance on all benchmarks.
 
-The behaviors of the different datasets across the 160M and 1.4B architectures suggest that the relationship between factors like dataset size, training duration, and model capacity is more complex than initially thought. In this regime, the Density sampling approach appears effective when combined with aggressive dataset size reduction.
+The behaviors across 160M and 1.4B architectures suggest that looking at smaller models alone is misleading when evaluating dataset distillation techniques. The relationship between factors like dataset size, training duration, and model capacity is more complex than initially thought. In this regime, the Density sampling approach appears highly effective when combined with aggressive dataset size reduction, both on 160M and 1.4B. 
 
-Summarizing the key findings:
-> A dataset distillation's performance scales inversely with the size of the model that it will be applied to.<br>
-> Reducing the distillate size can serve as a regularizer against overfitting, as epoch count increases.<br>
-> Within the Pythia 160M model family, the optimal dataset size may actually be smaller than previously assumed with MiniPile, as signs of overfitting could be observed, and saturation was witnessed with earlier steps.<br>
-> The suggested best sampling approach, i.e. weight-density-based sampling, is a promising candidate for further exploration.
+**Summarizing the key findings:**
+1. Dataset distillation effectiveness cannot be properly evaluated using only individual architectures (like small 160M parameters). These models may be hitting architectural capacity limits that mask true implications of data reduction by overfitting.
+2. Distilled datasets can work well with smaller models, however, they fundamentally fail to preserve patterns and relationships needed for larger models to achieve competitive capabilities. The 1.4B models demonstrated an inability to match the Pile Dedup performance, regardless of the employed sampling method.
+3. Reducing the distillate size can serve as a regularizer against overfitting, as epoch count increases, helping in preserving reasoning capabilities.
+4. Within the Pythia 160M model family, the optimal dataset size may actually be smaller than previously assumed with MiniPile, as signs of overfitting could be observed, and saturation was witnessed with earlier steps.<br>
+5. The suggested best sampling approach, i.e. weight-density-based sampling, is a promising candidate for further exploration, especially when combined with aggressive dataset size reduction. Improvements could be witnessed both across 160M and 1.4B trainings.
+6. The relationship between dataset size and model performance cannot be deemed monotonic. Surprisingly, even at 1.4B scale, the heavily size-reduced Density Pico showed better reasoning capabilities than four times larger distillations while maintaining only lightly lower perplexity scores. This suggests there are complex, hidden, task-dependent optima in data-to-parameter ratios that may be attainable with substantially lower sample counts than previously thought. Based on the flat-out worse distillation performances though, we can't expect these optima alone to suffice in replacing the full dataset. They might be interesting for e.g. curriculum learning approaches, though.
+7. Based on 6, we suggest that current proxy- and proximity-based geometric sampling approaches like MiniPile may be fundamentally discovering the interplay between data and model capacity, but are themselves, just yet, insufficient for creating smaller, truly representative datasets across all model sizes.
 
 ## Improving the MiniPile Pipeline, Theoretically
 
 All of the above improvements and modifications aim to be specifically applicable within resource-constrained (e.g. academic) environments.<br>
-At a minimum, you only need disk space for The Pile Deduplicated, its embedded version (I create a copy of Pile Deduplicated because I want to ensure index consistency), the clustering results and the MiniPile you want to sample from it. You will need a GPU for the embedding and clustering steps, but the sampling can be done on a CPU-only machine.
+At a minimum, only the disk space for The Pile Deduplicated, its embedded version (I create a copy of Pile Deduplicated because I want to ensure index consistency), the clustering results and the MiniPile you want to sample from it are required. You will need a recent consumer-grade GPU for the embedding and clustering steps, but the sampling can again be done on a CPU-only machine.
 
 Imposing this constraint for accessibility naturally limits the reachable improvement space for the MiniPile pipeline.<br>
 The `04_improve_minipile.ipynb` notebook contains a theoretical section that discusses more fundamental improvements that could be made if the resource constraint was lifted.<br>
