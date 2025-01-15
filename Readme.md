@@ -75,7 +75,7 @@ Size-density-proportionate sampling is a specific setting that emerged from the 
 ![](./img/density.png)
 
 Here, $|C_i|$ is the number of documents in cluster $i$, $|\bigcup_{j} C_j|$ is the total number of documents in all non-excluded clusters, and $\rho(C_i)$ is the density of cluster $i$. Per cluster, the density is calculated by finding the distance from each data point in the cluster to the centroid, adding up all these distances and dividing the sum by the number of data points in the cluster. The impact of the density is scaled by the hyperparameter $\omega$ with the intention of allowing to reduce a risk of over-representation of overly sparse clusters compared to dense, still informative regions in the embedding space.<br>
-For size-density-proportionate sampling, we set $\omega = 0.5$.
+For size-density-proportionate sampling, we set $\omega = 0.5$ to reduce the weight of the density for the proportion calculation.
 
 ## Benchmark Results
 
