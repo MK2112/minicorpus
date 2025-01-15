@@ -66,19 +66,21 @@ We deem the `Size-Density-Proportionate Sampling` (Idea 3) the most impactful, a
 
 ### Size-Density-Proportionate Sampling
 
-Like the other ideas too, this improvement idea and its inception are extensively documented in `04_improve_minipile.ipynb`. A brief summary: 
+Like the other ideas too, this improvement idea and its inception are extensively documented in `04_improve_minipile.ipynb`.<br>
+As this approach provided the most interesting results, it is listed here as well.<br>
+A brief summary: 
 
-Size-density-proportionate sampling is a specific setting that emerged from the density-based sampling idea that calculates cluster contribution proportions to the distilled target dataset like so:
+Size-density-proportionate sampling is a specific setting that emerged from the density-based sampling idea, which calculates cluster contribution proportions to the distilled target dataset like so:
 
 ![](./img/density.png)
 
-Here, $|C_i|$ is the number of documents in cluster $i$, $|\bigcup_{j} C_j|$ is the total number of documents in all non-excluded clusters, and $\rho(C_i)$ is the density of cluster $i$. The density is calculated by finding the distance from each data point in the cluster to the cluster's centroid, adding up all these distances and dividing the sum by the number of data points in the cluster. The impact of the density is scaled by the hyperparameter $\omega$ with the intention of allowing to reduce a risk of over-representation of overly sparse clusters compared to dense, still informative regions in the embedding space.<br>
+Here, $|C_i|$ is the number of documents in cluster $i$, $|\bigcup_{j} C_j|$ is the total number of documents in all non-excluded clusters, and $\rho(C_i)$ is the density of cluster $i$. Per cluster, the density is calculated by finding the distance from each data point in the cluster to the centroid, adding up all these distances and dividing the sum by the number of data points in the cluster. The impact of the density is scaled by the hyperparameter $\omega$ with the intention of allowing to reduce a risk of over-representation of overly sparse clusters compared to dense, still informative regions in the embedding space.<br>
 For size-density-proportionate sampling, we specifically set $\omega = 0.5$ to have neither cluster size nor density dominate the proportion calculation.
 
 ## Benchmark Results
 
 Detailed results can be found in the [benchmarks](./benchmarks/) folder.<br>
-Benchmark comparisons were additionally documented in the [MiniPile_Pile_Benchmark_Comparisons](./MiniPile_Pile_Benchmark_Comparisons.ods) spreadsheet.<br>
+Benchmark comparisons were additionally documented in the [MiniPile_Pile_Benchmark_Comparisons.ods](./MiniPile_Pile_Benchmark_Comparisons.ods) spreadsheet.<br>
 LaTeX-versions of the below tables can be found in the [benchmark_results.pdf](./img/benchmark_results.pdf) (markdown tables below for readability).
 
 ### Pythia 160M models
@@ -122,7 +124,7 @@ With this study project, we successfully replicated the MiniPile pipeline, produ
 
 ### Reproduction Challenges and Insights
 
-Even though the reproduction had to make assumptions and compromises, benchmark performance was largely retained or even slightly improved (within a single digit percentage range, <= 2.23%). We consider this to be within the margin of error and therefore not a significant deviation. The reproduction of MiniPile was therefore successful.
+Even though the reproduction had to make assumptions and compromises, benchmark performance was largely retained or even slightly improved (within a single digit percentage range, <= 2.23%). We consider this to be within the margin of error and therefore not a significant deviation. The reproduction of MiniPile was therefore deemed successful.
 
 ### 160M Benchmark Insights
 
