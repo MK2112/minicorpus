@@ -46,7 +46,7 @@ Jupyter Notebooks are added for each chapter for documentation and guidance.
 
 - Chapter `01` is concerned with downloading The Pile Deduplicated and the original MiniPile as baseline. Be sure to have enough disk space available.
     - The guide is available in the Jupyter Notebook `01_get_piles.ipynb`.
-- Chapter `02` regards training a [Pythia](https://arxiv.org/abs/2304.01373) [160M](https://huggingface.co/EleutherAI/pythia-160m) model on the original MiniPile and benchmarking it with the [EleutherAI LM Evaluation Harness](https://github.com/EleutherAI/lm-evaluation-harness). 
+- Chapter `02` regards training a [Pythia](https://arxiv.org/abs/2304.01373) [160M](https://huggingface.co/EleutherAI/pythia-160m) model on the original MiniPile and benchmarking it in zero-shot settings with the [EleutherAI LM Evaluation Harness](https://github.com/EleutherAI/lm-evaluation-harness). 
     - The guide is available in the Jupyter Notebook `02_eval_160M.ipynb`.
 - Chapter `03` is about reproducing MiniPile from scratch. This includes embedding The Pile Deduplicated, clustering the embeddings, and sampling a MiniPile from the clusters in accordance with the [original paper](https://arxiv.org/abs/2304.08442).
 
@@ -73,7 +73,7 @@ All individual ideas are documented extensively in the fourth chapter's Jupyter 
 6.1. Inter-Intra-Cluster Sampling with Inter-Cluster Diversity Weighting Increased (`04_distill_pile_embed_idea_6.1_inter_high.py`)
 7. Down-Sized Size-Density-Proportionate Sampling (`04_distill_pile_embed_idea_7_density-tiny.py`, `04_distill_pile_embed_idea_7_density-nano.py` and `04_distill_pile_embed_idea_7_density-pico.py`)
 
-Benchmark results can be found further below.<br>
+Zero-shot Benchmark results can be found further below.<br>
 We deem the **Size-Density-Proportionate Sampling** (Idea 3) the most interesting and impactful idea, as it is more representative of the original Pile Deduplicated while being smaller in example count than MiniPile. Compared to the reproduction, improvements were observed on the WinoGrande, ARC-Challenge and BLiMP benchmarks. This approach was further investigated in (Ideas 7, 8, 9) to reduce the distilled, density-sampled dataset size to 90% (Idea 7) of the dataset created in (Idea 3), and then 75% (Idea 8) as well as 25% (Idea 9) of the original MiniPile size, respectively.
 
 ### Size-Density-Proportionate Sampling
@@ -101,7 +101,8 @@ As it was a goal to produce a smaller, more retaining/representative version of 
 
 Detailed results can be found in the [benchmarks](./benchmarks/) folder.<br>
 Benchmark comparisons were additionally documented in the [MiniPile_Pile_Benchmark_Comparisons.ods](./MiniPile_Pile_Benchmark_Comparisons.ods) spreadsheet, where more rigorous statistical analysis is also conducted.<br>
-LaTeX-versions of the below tables can be found in the [benchmark_results.pdf](./img/benchmark_results.pdf) (markdown tables below for readability).
+LaTeX-versions of the below tables can be found in the [benchmark_results.pdf](./img/benchmark_results.pdf) (markdown tables below for readability).<br>
+All benchmarks indicate zero-shot performance.
 
 ### Pythia 160M models
 
