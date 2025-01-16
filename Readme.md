@@ -7,6 +7,8 @@ MiniCorpus covers the following steps:
 2. Further improving the MiniPile pipeline and creating more effective versions of MiniPile.
 3. Preparing the optimized pipeline for general applicability with the theoretical example of [RefinedWeb (Penedo, et al. 2023)](https://arxiv.org/abs/2306.01116).
 
+Key findings and implications of this project can be found at the end of the [Conclusion](#conclusion) section.
+
 ## Project Setup
 
 1. Install Python 3.12.7
@@ -19,7 +21,7 @@ Every script in this respository has the instructions on how to run it at the en
 
 1. Download [The Pile Deduplicated](https://huggingface.co/datasets/EleutherAI/the_pile_deduplicated) from HuggingFace, e.g. by using `01_get_piles.ipynb`.
 2. Embed the Pile Deduplicated using `03_embed_pile_dedup_turbo.py`.
-3. Right when `03_embed_pile_dedup_turbo.py` starts processing, run `03_cluster_pile_embed.py` to cluster the embeddings. The clustering script was built to run the fitting of k-Means in parallel with the embedding script producing new embeddings.
+3. As `03_embed_pile_dedup_turbo.py` starts with the actual processing, run `03_cluster_pile_embed.py` to cluster the embeddings. The clustering script was built to run the fitting of k-Means in parallel with the embedding script producing new embeddings.
 4. After the embedding script finishes, `03_cluster_pile_embed.py` will store the centroids and automatically start clustering the embeddings.
 5. Once clustering concluded, you may inspect the generated `cluster_info_for_inspection.json` in the `MiniPile_BatchKMeans` folder for manual cluster exclusion.
 6. Run `03_sort_pile_clusters.py` to have the clustered embeddings sorted by their assigned cluster into dedicated `jsonl` files.
@@ -39,17 +41,18 @@ Jupyter Notebooks are added for each chapter for documentation and guidance.
     - The guide is available in the Jupyter Notebook `02_eval_160M.ipynb`.
 - Chapter `03` is about reproducing MiniPile from scratch. This includes embedding The Pile Deduplicated, clustering the embeddings, and sampling a MiniPile from the clusters in accordance with the [original paper](https://arxiv.org/abs/2304.08442).
 
-We deem our reproduction of MiniPile successful. However, our reproduction had to make compromises:
+We deem our reproduction of MiniPile successful.<br>
+However, we had to make compromises:
 1. Embedding with [E5-Large](https://huggingface.co/intfloat/e5-large) was replaced with [E5-Base-4k](https://huggingface.co/dwzhu/e5-base-4k), which is smaller and faster, but [reported to perform worse](https://mono.software/2024/11/07/testing-embedding-models-rag/) than E5-Large representation-wise. We addressed this by raising the context window from E5-large's default 512 tokens to 1024 tokens.
 2. Cluster exclusion was done manually, as per paper. While we found and excluded the exact same amount of clusters and the same clusters described as examples by the paper, differences in cluster selection may have occured.
 
-The reproduction dataset showed improvements, and therefore deviations, regarding the perplexity scores on the Lambada (Standard + OpenAI) benchmarks, HellaSwag and ARC-Challenge of at most 2.23%.
+The reproduction dataset showed improvements, and therefore deviations, regarding the perplexity scores on the Lambada (Standard + OpenAI) benchmarks, HellaSwag and ARC-Challenge of a gravity of at most 2.23%.
 
 ## Improving the MiniPile Pipeline, Practically
 
 The MiniPile pipeline can be improved by sampling a data subset that is ideally even smaller than MiniPile and yet more representative of the original Pile Deduplicated.<br>
 Ultimately resulting in success, several attempts were undertaken to improve the MiniPile pipeline for these objectives.<br>
-All ideas are documented in the fourth chapter's Jupyter Notebook `04_improve_minipile.ipynb`:
+All ideas are documented extensively in the fourth chapter's Jupyter Notebook [`04_improve_minipile.ipynb`](./04_improve_minipile.ipynb), which lays out the intentions and reasonings more thoroughly:
 
 1. Cluster-Proportionate Sampling (`04_distill_pile_embed_idea_1_proportionate.py`)
 2. Hybrid Loss-Based Sampling (`04_distill_pile_embed_idea_2_lossi_1.py` and `04_distill_pile_embed_idea_2_lossi_2.py`)
@@ -62,12 +65,12 @@ All ideas are documented in the fourth chapter's Jupyter Notebook `04_improve_mi
 7. Down-Sized Size-Density-Proportionate Sampling (`04_distill_pile_embed_idea_7_density-tiny.py`, `04_distill_pile_embed_idea_7_density-nano.py` and `04_distill_pile_embed_idea_7_density-pico.py`)
 
 Benchmark results are available below.<br>
-We deem the `Size-Density-Proportionate Sampling` (Idea 3) the most impactful, as it is the most representative of the original Pile Deduplicated while being smaller in example count than MiniPile. Strongest improvements were observed on the Lambada (Std) benchmark with an improvement of over 50% in perplexity. This approach was further used in (Ideas 7, 8, 9) to reduce the distilled, density-sampled dataset size to 90% (Idea 7) of the dataset created in (Idea 3), and then 75% (Idea 8) as well as 25% (Idea 9) of the original MiniPile, respectively.
+We deem the **Size-Density-Proportionate Sampling** (Idea 3) the most impactful, as it is the most representative of the original Pile Deduplicated while being smaller in example count than MiniPile. Strongest improvements were observed on the Lambada (Std) benchmark with an improvement of over 50% in perplexity. This approach was further used in (Ideas 7, 8, 9) to reduce the distilled, density-sampled dataset size to 90% (Idea 7) of the dataset created in (Idea 3), and then 75% (Idea 8) as well as 25% (Idea 9) of the original MiniPile, respectively.
 
 ### Size-Density-Proportionate Sampling
 
-Like all the other ideas, this improvement idea and its inception were extensively documented in `04_improve_minipile.ipynb`.<br>
-As this approach provided the most interesting results, it is briefly layed out here as well:
+Like the other ideas, this improvement idea and its inception were extensively documented in [`04_improve_minipile.ipynb`](./04_improve_minipile.ipynb).<br>
+As this approach provided the most interesting results, it is briefly layed out here:
 
 Size-density-proportionate sampling is a specific setting applied to the density-based sampling idea, which calculates cluster contribution proportions to the distilled target dataset like so:
 
