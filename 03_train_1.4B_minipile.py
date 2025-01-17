@@ -1,3 +1,6 @@
+# Adapted from 02_eval_160M.ipynb
+# Training script for Distributed Training of Pythia 1.4B on MiniPile
+
 import os
 import torch
 import numpy as np
@@ -9,8 +12,6 @@ from huggingface_hub import snapshot_download
 from torch.optim.lr_scheduler import _LRScheduler
 from transformers import DataCollatorForLanguageModeling
 from transformers import AutoModelForCausalLM, AutoTokenizer, Trainer, TrainingArguments, get_cosine_schedule_with_warmup
-
-# Training script for Distributed Training of Pythia 1.4B on the original MiniPile
 
 base_dir = "/vol/tmp/koppelmm"
 base_path = Path(base_dir)
@@ -179,7 +180,7 @@ def training():
         min_lr=2e-5 # Pythia 1.4B-specific
     )
 
-    # Train Pythia 160M Untrained on MiniPile
+    # Train Pythia 1.4B Untrained on MiniPile
     # https://huggingface.co/docs/transformers/v4.46.0/en/main_classes/trainer
     trainer = Trainer(model=empty_model,
                     args=training_args,
@@ -189,6 +190,8 @@ def training():
                     optimizers=(optimizer, scheduler))
 
     trainer.train()
+
+    # Why is this a two-step process?!
     trainer.save_model(str(base_path / "pythia1.4b_minipile_trained")) # This saves the model weights
 
 if __name__ == "__main__":
@@ -197,11 +200,7 @@ if __name__ == "__main__":
 
 # tmux new -s 14b_minipile
 # conda activate minipile
-# torchrun --nproc_per_node=4 03_train_1.4B_minipile.py
-# I ran with CUDA_VISIBLE_DEVICES=0,1,2 torchrun --nproc_per_node=3 03_train_1.4B_minipile.py
 # Detach from tmux session: Ctrl-b followed by d
 # Reattach to tmux session: tmux attach -t 14b_minipile
 # tmux list-sessions
 # tmux kill-session -t 14b_minipile
-#
-# 

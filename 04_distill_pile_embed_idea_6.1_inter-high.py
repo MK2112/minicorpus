@@ -12,6 +12,10 @@ from dataclasses import dataclass, field
 from multiprocessing import Pool, cpu_count
 from sklearn.metrics.pairwise import cosine_distances
 
+# Ablation study for Idea 6: Inter-cluster diversity, high focus on the inter-cluster diversity
+# Weigh the cluster diversity higher than the cluster size and cluster density
+# Will this promote a more diverse selection of documents from across the clusters?
+
 @dataclass
 class DistillConfig:
     base_dir: Path = Path("/vol/tmp/koppelmm")

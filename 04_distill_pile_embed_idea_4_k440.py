@@ -11,6 +11,10 @@ from fastparquet import ParquetFile
 from dataclasses import dataclass, field
 from multiprocessing import Pool, cpu_count
 
+# Idea 4:
+# Raise the resolution by which we differentiated pockets of embeddings of the dataset by a factor of 2?
+# Will this have us produce a more nuanced dataset, as we more finely differentiate the embeddings and could remove more specific clusters?
+
 @dataclass
 class DistillConfig:
     base_dir: Path = Path("/vol/tmp/koppelmm")

@@ -11,13 +11,15 @@ from transformers import DataCollatorForLanguageModeling
 from transformers import AutoModelForCausalLM, AutoTokenizer, Trainer, TrainingArguments, get_cosine_schedule_with_warmup
 
 # Training script for Distributed Training of Pythia 160M on MiniPile
+# Using step0 of this model: https://huggingface.co/EleutherAI/pythia-160m-deduped
+# Applying this training set: https://huggingface.co/datasets/JeanKaddour/minipile
 
 base_dir = "/vol/tmp/koppelmm"
 base_path = Path(base_dir)
 
 class CosineSchedulerWithMinLR(_LRScheduler):
-    # Basically wrapping the get_cosing_schedule_with_warmup in a lower-bound setting
-    # Allows for Cosine Scheduling with a min_lr enforced
+    # Basically wrapping the get_cosine_schedule_with_warmup in a lower-bound setting
+    # Allows for Cosine Scheduling with a min_lr enforcement
     def __init__(self, optimizer, num_warmup_steps, num_training_steps, min_lr=6e-5):
         self.min_lr = min_lr
         self.base_scheduler = get_cosine_schedule_with_warmup(
@@ -134,7 +136,7 @@ def training():
         print("No CUDA-capable GPUs available")
 
     output_dir = str(base_path / "pythia160m_minipile_trained")
-    log_dir = str(base_path / "160m_minipile_logs") # This turned out to be empty, but I'll leave it here for completemess
+    log_dir = str(base_path / "160m_minipile_logs")
     os.makedirs(output_dir, exist_ok=True)
     os.makedirs(log_dir, exist_ok=True)
 
@@ -145,7 +147,7 @@ def training():
         num_train_epochs=1.5,            # Since train_iters gets set, use num_train_epochs=1.5 like for The Pile
         per_device_train_batch_size=batch_size,   # Gives an effective batch size of 1024 after grad accum
         per_device_eval_batch_size=batch_size,    # Same as training batch size
-        gradient_accumulation_steps=(total_batch // batch_size), # Achieve a batch size of 1024
+        gradient_accumulation_steps=(total_batch // batch_size // device_count), # Achieve a batch size of 1024
         learning_rate=6e-4,              # Default Pythia 160M
         weight_decay=0.01,               # Default Pythia 160M
         max_steps=1024,                  # Adjusted for MiniPile (https://discuss.huggingface.co/t/how-does-max-steps-affect-the-number-of-samples-the-model-sees/69681)
@@ -180,11 +182,11 @@ def training():
     # Train Pythia 160M Untrained on MiniPile
     # https://huggingface.co/docs/transformers/v4.46.0/en/main_classes/trainer
     trainer = Trainer(model=empty_model,
-                    args=training_args,
-                    train_dataset=minipile_train_tokenized,
-                    eval_dataset=minipile_val_tokenized,
-                    data_collator=data_collator,
-                    optimizers=(optimizer, scheduler))
+                      args=training_args,
+                      train_dataset=minipile_train_tokenized,
+                      eval_dataset=minipile_val_tokenized,
+                      data_collator=data_collator,
+                      optimizers=(optimizer, scheduler))
 
     trainer.train()
     trainer.save_model(str(base_path / "pythia160m_minipile_trained")) # This saves the model weights
@@ -199,5 +201,5 @@ if __name__ == "__main__":
 # Reattach to tmux session: tmux attach -t 160m_minipile
 # tmux list-sessions
 # tmux kill-session -t 160m_minipile
-
+#
 # Training took 33.2 hours on gruenau8

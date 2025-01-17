@@ -11,6 +11,10 @@ from fastparquet import ParquetFile
 from dataclasses import dataclass, field
 from multiprocessing import Pool, cpu_count
 
+# Idea 5:
+# Kind of an ablation on both idea 3 and 4, but thus exploring a new space and therefore deemed its own idea.
+# How about combining a high resolution clustering with a size-density-sampling approach?
+
 @dataclass
 class DistillConfig:
     base_dir: Path = Path("/vol/tmp/koppelmm")

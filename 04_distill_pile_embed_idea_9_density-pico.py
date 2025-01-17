@@ -11,6 +11,10 @@ from typing import Set, Dict, List
 from multiprocessing import Pool, cpu_count
 from fastparquet import ParquetFile
 
+# Idea 9: DensityPico
+# Kind of an ablation of Idea 3, but focuses solely on target dataset size reduction.
+# Taking the target dataset size reduction to an extreme, we create a training set size of 250k, 25% of the original MiniPile.
+
 @dataclass
 class DistillConfig:
     base_dir: Path = Path("/vol/tmp/koppelmm")

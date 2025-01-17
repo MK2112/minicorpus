@@ -9,6 +9,7 @@ base_path = Path(base_dir)
 
 # Benchmark Script for Pythia 1.4B models
 # using the EleutherAI LM-Eval Harness
+# Benchmarks conducted on "arc_challenge", "mmlu", "winogrande", "hellaswag", "lambada", "blimp", "arc_easy"
 
 device = "cuda" if torch.cuda.is_available() else "cpu"
 pythia_pile = AutoModelForCausalLM.from_pretrained(base_path / "pythia1.4b_dedup_pile", local_files_only=True)

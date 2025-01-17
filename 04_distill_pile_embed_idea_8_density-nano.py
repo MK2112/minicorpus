@@ -11,6 +11,10 @@ from typing import Set, Dict, List
 from multiprocessing import Pool, cpu_count
 from fastparquet import ParquetFile
 
+# Idea 8: DensityNano
+# Kind of an ablation of Idea 3, but focuses solely on target dataset size reduction.
+# We aim for 750k training examples. 75% of the original MiniPile's size.
+
 @dataclass
 class DistillConfig:
     base_dir: Path = Path("/vol/tmp/koppelmm")

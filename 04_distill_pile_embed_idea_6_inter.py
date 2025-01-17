@@ -12,6 +12,10 @@ from dataclasses import dataclass, field
 from multiprocessing import Pool, cpu_count
 from sklearn.metrics.pairwise import cosine_distances
 
+# Idea 6: Inter-cluster diversity
+# This idea is about the diversity of the clusters themselves, as well as the documents within them.
+# Sample documents from clusters that are diverse in terms of their centroid distances.
+
 @dataclass
 class DistillConfig:
     base_dir: Path = Path("/vol/tmp/koppelmm")

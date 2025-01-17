@@ -11,6 +11,13 @@ from fastparquet import ParquetFile
 from dataclasses import dataclass, field
 from multiprocessing import Pool, cpu_count
 
+# Idea 3:
+# Density-based sampling implements sampling by a cluster proportion calculated like so:
+# $\text{Cluster Proportion}_i = \frac{|C_i|}{|\bigcup_j C_j|} \cdot (1 - \omega \cdot \rho(C_i))$
+# The specific realization of this, size-density-proportionate sampling, sets $\omega = 0.5$.
+# This is as to, during sampling, favor large clusters while still explicitly allowing for
+# diversity (low density regions) to be favorably sampled from too.
+
 @dataclass
 class DistillConfig:
     base_dir: Path = Path("/vol/tmp/koppelmm")

@@ -10,6 +10,8 @@ from collections import defaultdict
 from sklearn.cluster import MiniBatchKMeans
 from sklearn.metrics.pairwise import cosine_distances
 
+# Related to MiniPile improvement idea 4: Double the clusters to look for: make it k=440
+
 base_path = Path("/vol/tmp/koppelmm")
 embd_dir = base_path / "Pile_Deduplicated_Embd" # This is where the embeddings are stored/written to (create "End_Here.txt" here to signal end)
 cluster_dir = base_path / "MiniPile_BatchKMeans_Double"

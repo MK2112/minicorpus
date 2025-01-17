@@ -11,6 +11,10 @@ from typing import Set, Dict, List
 from multiprocessing import Pool, cpu_count
 from fastparquet import ParquetFile
 
+# Idea 7: DensityTiny
+# Kind of an ablation of Idea 3, but focuses solely on target dataset size reduction.
+# We aim for 842k documents, which is 90% of the original MiniPile Density.
+
 @dataclass
 class DistillConfig:
     base_dir: Path = Path("/vol/tmp/koppelmm")

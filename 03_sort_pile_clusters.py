@@ -5,10 +5,11 @@ from tqdm import tqdm
 from collections import defaultdict
 from multiprocessing import Manager, Process, cpu_count
 
-# Run this after "03_cluster_pile_embed.py"
-# Run this before "03_distill_minipile.py"
 # Sorts the (index-consistent but cluster-wise unsorted) entries from the clustering process to be grouped by clusters.
 # Could have been done in "03_cluster_pile_embed.py" already, but this is SoC.
+#
+# Run this after "03_cluster_pile_embed.py"
+# Run this before "03_distill_minipile.py"
 
 inp_path = Path("/vol/tmp/koppelmm/MiniPile_BatchKMeans/clustering_results")
 out_path = Path("/vol/tmp/koppelmm/MiniPile_BatchKMeans/clustering_sorted")

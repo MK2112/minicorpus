@@ -15,7 +15,9 @@ from datasets import load_dataset, Dataset
 from huggingface_hub import snapshot_download
 from sentence_transformers import SentenceTransformer
 
-# Do not use this script. I left it here purely for reference.
+# Do not use this script.
+# 
+# I left it here purely for reference.
 # This is what naivite looks like. The script is slow and inefficient and crashes with OOM.
 # Use the turbo version instead: 03_embed_pile_dedup_turbo.py
 

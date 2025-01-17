@@ -11,6 +11,11 @@ from fastparquet import ParquetFile
 from dataclasses import dataclass, field
 from multiprocessing import Pool, cpu_count
 
+# Ablation study on idea 3: 
+# How low can we go? In other words, how harshly can we favor sparse regions during sampling?
+# This script realizes density-based sampling, but with an increased weight on the density factor. The higher the density, the lower the chance of sampling.
+# Will sampling from sparse regions being overly preferred help in depicting the overall dataset's characteristics and knowledge better?
+
 @dataclass
 class DistillConfig:
     base_dir: Path = Path("/vol/tmp/koppelmm")

@@ -9,7 +9,9 @@ from dataclasses import dataclass
 from typing import Set, Dict, List
 from collections import defaultdict
 
-# This doesn't work and it was left here solely for reference. This established a lot of the structure that I used for the actual implementation.
+# This doesn't work and it was left here solely for reference. 
+# 
+# This established a lot of the structure that I used for the actual implementation.
 # I tinkered with this masking step idea for a while, ultimately trying to find a most appropriate way to distill the MiniPile dataset.
 # I moved on to build the working 03_distill_pile_embed.py
 

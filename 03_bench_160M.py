@@ -6,6 +6,7 @@ from transformers import AutoModelForCausalLM, AutoTokenizer
 
 # Benchmark Script for Pythia 160M models
 # using the EleutherAI LM-Eval Harness
+# Benchmarks conducted on "arc_challenge", "mmlu", "winogrande", "hellaswag", "lambada", "blimp"
 
 base_dir = "/vol/tmp/koppelmm"
 base_path = Path(base_dir)

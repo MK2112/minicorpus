@@ -25,9 +25,9 @@ class DistillConfig:
     cluster_dir: Path = base_dir / "MiniPile_BatchKMeans/clustering_sorted"
     cluster_info_path: Path = base_dir / "MiniPile_BatchKMeans/clustering_results/cluster_info_for_inspection.json"
     embd_dir: Path = base_dir / "Pile_Deduplicated_Embd"
-    num_clusters: int = 220 # As per paper
+    num_clusters: int = 220           # As per paper
     num_clusters_to_exclude: int = 38 # As per paper
-    edition: str = "Proportioned" # Version of MiniPile, distinguishes file naming + output directory
+    edition: str = "Proportioned"     # Version of MiniPile, distinguishes file naming + output directory
     excluded_clusters: Set[int] = field(default_factory=lambda: {10, 15, 16, 22, 26, 28, 35, 37, 39, 40, 44, 46, 
                                                                  51, 57, 61, 64, 78, 86, 87, 88, 90, 94, 99, 101,
                                                                  102, 103, 111, 114, 152, 155, 163, 166, 167, 181,

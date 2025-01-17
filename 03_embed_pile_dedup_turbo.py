@@ -17,6 +17,8 @@ from datasets import load_dataset, Dataset
 from huggingface_hub import snapshot_download
 from transformers import AutoTokenizer, AutoModel
 
+# Use this instead of 03_embed_pile_dedup.py
+
 @dataclass
 class Config:
     base_dir: str = "/vol/tmp/koppelmm"
