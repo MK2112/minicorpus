@@ -195,7 +195,7 @@ if __name__ == "__main__":
     training()
 
 # tmux new -s 160m_minipile
-# conda activate minipile
+# conda activate minicorpus
 # torchrun --nproc_per_node=4 02_train_160M_minipile.py
 # Detach from tmux session: Ctrl-b followed by d
 # Reattach to tmux session: tmux attach -t 160m_minipile

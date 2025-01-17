@@ -40,7 +40,7 @@ with open('04_eval_1.4B_dedup_pile_table_easy.txt', 'w') as f:
 
 # tmux new -s bench_14B
 # tmux attach -t bench_14B
-# conda activate minipile
+# conda activate minicorpus
 # 
 # CUDA_VISIBLE_DEVICES=2 python 03_bench_1.4B.py
 #  

@@ -223,6 +223,6 @@ if __name__ == "__main__":
 #    return embd_data.select(np.where(mask)[0])
 # 
 # But honestly, while I think this could work, the overhead this would create for training is such a nightmare that I don't want it.
-# I think biting the bullet and creating a new dataset is the way to go. I'll do that instead. But hey, considering options, right?
+# I think biting the bullet and creating a new, cluster-wise sorted dataset is the way to go. I'll do that instead. But hey, considering options, right?
 
 # Writing a seperate 03_distill_pile.py script to create the MiniPile dataset is prob best for SoC and readability.

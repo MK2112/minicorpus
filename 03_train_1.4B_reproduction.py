@@ -195,7 +195,7 @@ if __name__ == "__main__":
     torch.cuda.empty_cache()
 
 # tmux new -s 14b_minipile_reproduction
-# conda activate minipile
+# conda activate minicorpus
 # torchrun --nproc_per_node=4 03_train_1.4B_reproduction.py
 # I ran with CUDA_VISIBLE_DEVICES=0,1,2 torchrun --nproc_per_node=3 03_train_1.4B_reproduction.py
 # Detach from tmux session: Ctrl-b followed by d

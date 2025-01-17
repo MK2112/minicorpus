@@ -276,7 +276,7 @@ if __name__ == "__main__":
     distiller.build_minicorpus()
 
 # tmux new -s mini_3
-# conda activate minipile
+# conda activate minicorpus
 # python 04_distill_pile_embed_idea_3_density.py
 # Detach from tmux session: Ctrl-b followed by d
 # Reattach to tmux session: tmux attach -t mini_3

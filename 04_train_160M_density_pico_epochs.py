@@ -193,7 +193,7 @@ if __name__ == "__main__":
     training()
 
 # tmux new -s 160m_minipile_pico_epoch
-# conda activate minipile
+# conda activate minicorpus
 # I ran with CUDA_VISIBLE_DEVICES=1 torchrun --nproc_per_node=1 04_train_160M_density_pico_epochs.py
 # May need to reset in later run, I don't know
 # Detach from tmux session: Ctrl-b followed by d

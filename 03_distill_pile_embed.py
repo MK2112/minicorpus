@@ -257,7 +257,7 @@ if __name__ == "__main__":
     distiller.build_minicorpus()
 
 # tmux new -s minipile
-# conda activate minipile
+# conda activate minicorpus
 # (pip install jsonlines)
 # python 03_distill_pile_embed.py
 # Detach from tmux session: Ctrl-b followed by d

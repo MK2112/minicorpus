@@ -232,7 +232,7 @@ if __name__ == "__main__":
     pipeline.run()
 
 # tmux new -s embed_rw
-# conda activate minipile
+# conda activate minicorpus
 # accelerate launch --mixed_precision fp16 --num_processes=1 04_embed_refinedweb_turbo.py
 # You can run this as multi-card process, but ... that won't do anything. Only one process persists.
 # Detach from tmux session: Ctrl-B followed by D

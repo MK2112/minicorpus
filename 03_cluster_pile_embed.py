@@ -340,7 +340,7 @@ if __name__ == "__main__":
         monitor_and_fit()
 
 # tmux new -s cluster_pile
-# conda activate minipile
+# conda activate minicorpus
 # python 03_cluster_pile_embed.py
 # Detach from tmux session: Ctrl-b followed by d
 # Reattach to tmux session: tmux attach -t cluster_pile

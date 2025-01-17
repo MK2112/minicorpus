@@ -265,7 +265,7 @@ if __name__ == "__main__":
     distiller.build_minicorpus()
 
 # tmux new -s mini_k440
-# conda activate minipile
+# conda activate minicorpus
 # python 04_distill_pile_embed_idea_4_k440.py
 # Detach from tmux session: Ctrl-b followed by d
 # Reattach to tmux session: tmux attach -t mini_k440

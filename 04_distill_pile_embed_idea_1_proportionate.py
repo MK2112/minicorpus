@@ -279,7 +279,7 @@ if __name__ == "__main__":
     distiller.build_minicorpus()
 
 # tmux new -s mini_1
-# conda activate minipile
+# conda activate minicorpus
 # (pip install jsonlines)
 # python 04_distill_pile_embed_idea_1_proportionate.py
 # Detach from tmux session: Ctrl-b followed by d

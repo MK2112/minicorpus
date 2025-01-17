@@ -40,7 +40,7 @@ with open('04_eval_160M_minipile_DensityProportionedHigh_table.txt', 'w') as f:
 
 # tmux new -s bench_160M
 # tmux attach -t bench_160M
-# conda activate minipile
+# conda activate minicorpus
 # 
 # CUDA_VISIBLE_DEVICES=1 python 03_bench_160M.py
 # 

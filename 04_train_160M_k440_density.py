@@ -194,7 +194,7 @@ if __name__ == "__main__":
     training()
 
 # tmux new -s 160m_minipile_k440_density
-# conda activate minipile
+# conda activate minicorpus
 # I ran with CUDA_VISIBLE_DEVICES=1 torchrun --nproc_per_node=1 04_train_160M_k440_density.py
 # Detach from tmux session: Ctrl-b followed by d
 # Reattach to tmux session: tmux attach -t 160m_minipile_k440_density

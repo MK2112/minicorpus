@@ -231,7 +231,7 @@ if __name__ == "__main__":
     print(f"[+] Mean losses saved to {config.output_loss_path}")
 
 # tmux new -s mini_2
-# conda activate minipile
+# conda activate minicorpus
 #
 # CUDA_VISIBLE_DEVICES=2 python 04_distill_pile_embed_idea_2_lossi_1.py
 #  

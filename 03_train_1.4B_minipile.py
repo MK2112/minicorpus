@@ -199,7 +199,7 @@ if __name__ == "__main__":
     torch.cuda.empty_cache()
 
 # tmux new -s 14b_minipile
-# conda activate minipile
+# conda activate minicorpus
 # Detach from tmux session: Ctrl-b followed by d
 # Reattach to tmux session: tmux attach -t 14b_minipile
 # tmux list-sessions

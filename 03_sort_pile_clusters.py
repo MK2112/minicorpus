@@ -112,7 +112,7 @@ if __name__ == "__main__":
         print(e)
 
 # tmux new -s sort_pile
-# conda activate minipile
+# conda activate minicorpus
 # python 03_sort_pile_clusters.py
 # Detach from tmux session: Ctrl-b followed by d
 # Reattach to tmux session: tmux attach -t sort_pile

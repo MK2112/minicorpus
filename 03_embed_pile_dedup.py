@@ -167,7 +167,7 @@ if __name__ == "__main__":
     pipeline.run()
 
 # tmux new -s embed_pile
-# conda activate minipile
+# conda activate minicorpus
 # accelerate launch --multi_gpu --gpu_ids 2,3 --mixed_precision fp16 --num_processes=2 03_embed_pile_dedup.py
 # DONT DO: accelerate launch --multi_gpu --mixed_precision fp16 --num_processes=4 03_embed_pile_dedup.py # maxes out at 38% usage per card
 # Detach from tmux session: Ctrl-b followed by d
