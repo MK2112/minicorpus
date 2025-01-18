@@ -1,6 +1,6 @@
 # MiniCorpus
 
-MiniCorpus reproduces and enhances [MiniPile (Kaddour, Jean. 2023)](https://arxiv.org/abs/2304.08442), a distilled subset of [The Pile Deduplicated](https://huggingface.co/datasets/EleutherAI/the_pile_deduplicated). MiniPile enables efficient LLM training using two orders of magnitude less data while aiming to maintain competitive performance compared to models trained on the full deduplicated Pile.
+MiniCorpus reproduces and investigates enhancements for [MiniPile (Kaddour, Jean. 2023)](https://arxiv.org/abs/2304.08442), a distilled subset of [The Pile Deduplicated](https://huggingface.co/datasets/EleutherAI/the_pile_deduplicated). MiniPile enables efficient LLM training using two orders of magnitude less data while aiming to maintain competitive performance compared to models trained on the full deduplicated Pile.
 
 MiniCorpus covers the following steps:
 1. Reproducing MiniPile from the deduplicated Pile from scratch using HuggingFace and PyTorch.
@@ -39,7 +39,7 @@ Every script in this respository has the instructions on how to run it at the en
 
 ## Reproducing MiniPile
 
-Reproduction of MiniPile's assembly is necessary to form a basis for attempts at improving it. The reproduction process is split across three chapters.<br>
+Reproduction of MiniPile's assembly is necessary to form a basis for attempts at improving it. The reproduction process is split across three chapters.
 Files belonging to these chapters are prefixed with `01_`, `02_`, and `03_` respectively.<br>
 Jupyter Notebooks are added for each chapter for documentation and guidance.
 
@@ -47,14 +47,14 @@ Jupyter Notebooks are added for each chapter for documentation and guidance.
     - The guide is available in the Jupyter Notebook `01_get_piles.ipynb`.
 - Chapter `02` regards training a [Pythia](https://arxiv.org/abs/2304.01373) [160M](https://huggingface.co/EleutherAI/pythia-160m) model on the original MiniPile and benchmarking it in zero-shot settings with the [EleutherAI LM Evaluation Harness](https://github.com/EleutherAI/lm-evaluation-harness). 
     - The guide is available in the Jupyter Notebook `02_eval_160M.ipynb`.
-- Chapter `03` is about reproducing MiniPile from scratch. This includes embedding The Pile Deduplicated, clustering the embeddings, and sampling a MiniPile from the clusters in accordance with the [original paper](https://arxiv.org/abs/2304.08442).
+- Chapter `03` is about reproducing MiniPile from scratch. This includes embedding the deduplicated Pile, clustering the embeddings, and sampling a MiniPile from the clusters in accordance with the [MiniPile paper](https://arxiv.org/abs/2304.08442).
 
 We deem our reproduction of MiniPile successful.<br>
 However, we had to make compromises:
 1. For embedding, [E5-Large](https://huggingface.co/intfloat/e5-large) was replaced with [E5-Base-4k](https://huggingface.co/dwzhu/e5-base-4k), which is smaller and faster, but [reported to perform worse](https://mono.software/2024/11/07/testing-embedding-models-rag/) than E5-Large representation-wise. We addressed this by raising the context window size from E5-Large's default 512 tokens to 1024 tokens.
 2. Cluster exclusion was done manually, as per paper. While we found and excluded the exact same amount of clusters with the same clusters described as examples by the paper, differences in cluster selection may have occured.
 
-The reproduction dataset showed deviations from the benchmark results reported for MiniPile. These were observed both in the positive and negative direction on the 160M architecture. Results on ARC-Challenge and MMLU deteriorated by 10.9% and 15% respectively, while HellaSwag, WinoGrande and BLiMP improved in the single digit percentage range. However, Lambada perplexity scores were reduced by 38.9% Lambada (OpenAI) and 55% Lambada (Std). This indicates that the produced dataset may be tilted in a slightly different direction content-wise due to embeddings or cluster selection. The single digit percentage point improvements witnessed on a majority of the benchmarks lead us to conclude that the reproduction is within the margin of error and therefore successful.
+The reproduction dataset showed deviations from the benchmark results produced for MiniPile. These were observed both in the positive and negative direction on the 160M architecture. Results on ARC-Challenge and MMLU deteriorated by 10.9% and 15% respectively, while HellaSwag, WinoGrande and BLiMP improved in the single digit percentage range. However, Lambada perplexity scores were reduced by 38.9% Lambada (OpenAI) and 55% Lambada (Std). This indicates that the produced dataset may be tilted in a slightly different direction content-wise due to embeddings or cluster selection. The single digit percentage point improvements witnessed on a majority of the benchmarks lead us to conclude that the reproduction is within the margin of error and therefore successful.
 
 ## Improving the MiniPile Pipeline, Practically
 
@@ -270,8 +270,8 @@ These theoretical improvements for assembly are:
 
 The final step of the MiniCorpus project is to prepare the optimized pipeline for general applicability with the example of RefinedWeb.<br>
 The RefinedWeb dataset is a subset of the CommonCrawl dataset that was deduplicated.<br>
-However, RefinedWeb is not a sum of diverse, smaller datasets like The Pile Deduplicated, but a single, large dataset.<br>
-Therefore, we have to find a way lift the need for $k$-means clustering and instead use a more general approach to sample a MiniRefinedWeb.
+However, RefinedWeb is not a clear sum of diverse, smaller datasets like The Pile Deduplicated, but a single, large dataset.<br>
+Therefore, we have to find a way lift the need for $k$-Means clustering and instead use a more general approach to sample a MiniRefinedWeb.
 The mending and adapting of the pipeline for RefinedWeb is documented in the Jupyter Notebook `05_refinedweb_pipeline.ipynb`.
 
 ## Produced Artifacts
