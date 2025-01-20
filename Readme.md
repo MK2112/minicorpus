@@ -265,6 +265,10 @@ These theoretical improvements for assembly are:
 - "Semantic Deduplication as Post-Processing for the distilled dataset", related to:
     - [SemDeDup: Data-efficient learning at web-scale through semantic deduplication (Abbas, et al. 2023)](https://arxiv.org/pdf/2303.09540)
 
+- "Reinforcement Learning-based sampling", related to:
+    - [Data Valuation using Reinforcement Learning (Joon, et al. 2019)](https://arxiv.org/abs/1909.11671)
+    - [Mastering Diverse Domains through World Models (Hafner, et al. 2023)](https://arxiv.org/abs/2301.04104)
+
 ## Preparing for general applicability
 
 The final step of the MiniCorpus project is to prepare the optimized pipeline for general applicability with the example of RefinedWeb.<br>
