@@ -337,7 +337,6 @@ The mending and adapting of the pipeline for RefinedWeb is documented in the Jup
 
 ## Related Work
 
-- [HuggingFace: EleutherAI/the_pile_deduplicated](https://huggingface.co/datasets/EleutherAI/the_pile_deduplicated)
 - [Datasheet for the Pile (Biderman, et al. 2022)](https://arxiv.org/abs/2201.07311)
 - [The Pile: An 800GB Dataset of Diverse Text for Language Modeling (Gao, et al. 2020)](https://arxiv.org/abs/2101.00027)
 - [The MiniPile Challenge for Data-Efficient Language Models (Kaddour, Jean. 2023)](https://arxiv.org/abs/2304.08442)
