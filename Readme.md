@@ -335,7 +335,7 @@ The mending and adapting of the pipeline for RefinedWeb is documented in the Jup
 - [pythia-1.4b-minipile_density-proportioned](https://huggingface.co/Marcus2112/pythia-1.4b-minipile_density-proportioned)
 - [pythia-1.4b-minipile_pico_density-proportioned](https://huggingface.co/Marcus2112/pythia-1.4b-minipile_pico_density-proportioned)
 
-## Related Work
+## Related Work - SuperMiniPile
 
 - [Datasheet for the Pile (Biderman, et al. 2022)](https://arxiv.org/abs/2201.07311)
 - [The Pile: An 800GB Dataset of Diverse Text for Language Modeling (Gao, et al. 2020)](https://arxiv.org/abs/2101.00027)
@@ -352,3 +352,10 @@ The mending and adapting of the pipeline for RefinedWeb is documented in the Jup
 - [Hashing for Similarity Search: A Survey (Wang, et al. 2014)](https://arxiv.org/pdf/1408.2927)
 - [Data Valuation using Reinforcement Learning (Joon, et al. 2019)](https://arxiv.org/abs/1909.11671)
 - [Mastering Diverse Domains through World Models (Hafner, et al. 2023)](https://arxiv.org/abs/2301.04104)
+
+## Related Work - MiniRefinedWeb
+
+- [Efficient Clustering of High-Dimensional Data Sets with Application to Reference Matching (McCallum, et al. 2000)](https://pubs.dbs.uni-leipzig.de/dc/files/McCallum2000Efficientclusteringofhighdimensionaldatasetswith.pdf)
+- [Improve BIRCH algorithm for big data clustering (Ramadhani, et al. 2020)](https://iopscience.iop.org/article/10.1088/1757-899X/725/1/012090)
+- [Using Projection-Based Clustering to Find Distance- and Density-Based Clusters in High-Dimensional Data (Thrun, M. C. & Ultsch, Alfred. 2020)](https://link.springer.com/article/10.1007/s00357-020-09373-2)
+- [Surpassing Cosine Similarity for Multidimensional Comparisons: Dimension Insensitive Euclidean Metric (DIEM) (Tessari, et al. 2024)](https://arxiv.org/abs/2407.08623)
