@@ -269,12 +269,12 @@ These theoretical improvements for assembly are:
     - [Data Valuation using Reinforcement Learning (Joon, et al. 2019)](https://arxiv.org/abs/1909.11671)
     - [Mastering Diverse Domains through World Models (Hafner, et al. 2023)](https://arxiv.org/abs/2301.04104)
 
-## Preparing for general applicability
+## RefinedWeb and Preparing for General Applicability
 
 The final step of the MiniCorpus project is to prepare the optimized pipeline for general applicability with the example of RefinedWeb.<br>
-The RefinedWeb dataset is a subset of the CommonCrawl dataset that was deduplicated.<br>
-However, RefinedWeb is not a clear sum of diverse, smaller datasets like The Pile Deduplicated, but a single, large dataset.<br>
-Therefore, we have to find a way lift the need for $k$-Means clustering and instead use a more general approach to sample a MiniRefinedWeb.
+The RefinedWeb dataset is a subset of the CommonCrawl dataset that was filtered and deduplicated.<br>
+However, RefinedWeb is not a clear sum of diverse, smaller datasets like The Pile Deduplicated.<br>
+Therefore, we have to find a way lift the need for $k$-Means clustering, which was based on knowledge of the Pile's assembly, and instead use a more general approach to sample a MiniRefinedWeb.
 The mending and adapting of the pipeline for RefinedWeb is documented in the Jupyter Notebook `05_refinedweb_pipeline.ipynb`.
 
 ## Produced Artifacts
