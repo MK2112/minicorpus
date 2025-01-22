@@ -45,7 +45,7 @@ Jupyter Notebooks are added for each chapter for documentation and guidance.
 
 - Chapter `01` is concerned with downloading The Pile Deduplicated and the original MiniPile as baseline. Be sure to have enough disk space available.
     - The guide is available in the Jupyter Notebook `01_get_piles.ipynb`.
-- Chapter `02` regards training a [Pythia](https://arxiv.org/abs/2304.01373) [160M](https://huggingface.co/EleutherAI/pythia-160m) model on the original MiniPile and benchmarking it in zero-shot settings with the [EleutherAI LM Evaluation Harness](https://github.com/EleutherAI/lm-evaluation-harness). 
+- Chapter `02` regards training a [Pythia](https://arxiv.org/abs/2304.01373) [160M](https://huggingface.co/EleutherAI/pythia-160m-deduped) model on the original MiniPile and benchmarking it in zero-shot settings with the [EleutherAI LM Evaluation Harness](https://github.com/EleutherAI/lm-evaluation-harness). 
     - The guide is available in the Jupyter Notebook `02_eval_160M.ipynb`.
 - Chapter `03` is about reproducing MiniPile from scratch. This includes embedding the deduplicated Pile, clustering the embeddings, and sampling a MiniPile from the clusters in accordance with the [MiniPile paper](https://arxiv.org/abs/2304.08442).
 
