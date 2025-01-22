@@ -39,7 +39,7 @@ class LossiConfig:
     excluded_clusters: Set[int] = field(default_factory=lambda: {10, 15, 16, 22, 26, 28, 35, 37, 39, 40, 44, 46, 
                                                                  51, 57, 61, 64, 78, 86, 87, 88, 90, 94, 99, 101,
                                                                  102, 103, 111, 114, 152, 155, 163, 166, 167, 181,
-                                                                 196, 200, 218, 219})
+                                                                 196, 200, 218, 219}) # field wrapping for multiprocessing compatibility
     pile_documents_count: int = 134_318_121
     train_count: int = 1_000_000
     val_count: int = 10_000
@@ -85,7 +85,7 @@ class LossiSampler:
             inputs = self.tokenizer(batch_texts, return_tensors="pt", truncation=True, max_length=self.config.doc_length, padding=True).to(self.device)
             with torch.no_grad():
                 # Process the batch of size 4
-                outputs = self.model(**inputs, labels=inputs["input_ids"])
+                outputs = self.model(**inputs, labels=inputs["input_ids"]) # passing key-value pairs from inputs dict as args to model's forward
                 losses.append(outputs.loss.item() / len(batch_texts)) # Normalize loss by batch size
             del inputs, outputs, batch_texts
             gc.collect()
@@ -184,7 +184,10 @@ class LossiSampler:
                 cluster_args = [(cluster_idx, valid_idxs, sampled_texts)
                                 for cluster_idx, valid_idxs in valid_idxs_cluster.items()
                                 if cluster_idx not in self.config.excluded_clusters]
-                results_iter = tqdm(pool.imap_unordered(process_cluster_texts, cluster_args), 
+                # https://superfastpython.com/multiprocessing-pool-imap_unordered/
+                # unordered to ... well, keep order (as is, not imposing anything)
+                # I had thought I'd need it elsewhere, here its kinda unnecessary; but hey, good habit I guess
+                results_iter = tqdm(pool.imap_unordered(process_cluster_texts, cluster_args),
                                     total=len(cluster_args), 
                                     desc="Grouping Sampled Texts", 
                                     unit="cluster")

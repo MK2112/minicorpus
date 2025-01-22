@@ -27,7 +27,7 @@ class DistillConfig:
     excluded_clusters: Set[int] = field(default_factory=lambda: {3, 6, 7, 8, 9, 19, 20, 24, 26, 32, 39, 46, 47, 48, 49, 50, 51, 54, 57, 60, 69,
                                                                  85, 89, 91, 92, 106, 108, 111, 120, 144, 147, 152, 162, 165, 169, 172, 176, 178,
                                                                  189, 199, 203, 208, 210, 212, 215, 216, 224, 227, 243, 244, 254, 264, 274, 283,
-                                                                 289, 299, 304, 322, 333, 338, 350, 369, 370, 388, 401, 404, 410, 413, 417, 430})
+                                                                 289, 299, 304, 322, 333, 338, 350, 369, 370, 388, 401, 404, 410, 413, 417, 430}) # field wrapping for multiprocessing compatibility
     train_count: int = 1_000_000
     val_count: int = 500
     test_count: int = 12_663 # 1M/500/10k Train/Val/Test total (I don't now why exactly, but nudging test +2,663 makes it 1M/500/10k in the end)
@@ -66,6 +66,7 @@ class MiniCorpusWriter:
         self.shard_counters = { split : 0 for split in ['train', 'validation', 'test'] }
     
     def _write_shard(self, split: str, force: bool = False):
+        # Write a shard for a specific split, force True writes buffer regardless of size
         buffer = self.buffers[split]
         print(f"[~] Writing {split} shard {self.shard_counters[split]}")
         if force or len(buffer) >= self.output_shard_size:

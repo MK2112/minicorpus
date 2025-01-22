@@ -110,6 +110,7 @@ def training():
     total_batch = 1024
 
     # Dynamic padding during training (mlm -> mask language model -> we're doing causal here)
+    # https://huggingface.co/docs/transformers/v4.48.0/en/main_classes/data_collator#transformers.DataCollatorForLanguageModeling
     data_collator = DataCollatorForLanguageModeling(tokenizer=tokenizer, mlm=False, pad_to_multiple_of=8)
 
     seed = 42
