@@ -19,7 +19,7 @@ The findings and implications of this project can be found at the end of the [Co
 
 ## Project Setup
 
-1. Install Python 3.12.7
+1. Install Python
 2. Install Anaconda
 3. Create the project's Conda environment using: `conda env create -f minicorpus.yaml`.
 
