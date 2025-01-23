@@ -3,7 +3,7 @@
 MiniCorpus reproduces and investigates enhancements for [MiniPile (Kaddour, Jean. 2023)](https://arxiv.org/abs/2304.08442), a distilled subset of [The Pile Deduplicated](https://huggingface.co/datasets/EleutherAI/the_pile_deduplicated), related to [(Gao, et al. 2020)](https://arxiv.org/abs/2101.00027). MiniPile enables efficient LLM training using two orders of magnitude less data while aiming to maintain competitive performance compared to models trained on the full deduplicated Pile.
 
 MiniCorpus covers the following steps:
-1. Reproducing MiniPile from the deduplicated Pile from scratch using HuggingFace and PyTorch.
+1. Reproducing MiniPile from the deduplicated Pile from scratch using the HuggingFace libraries and PyTorch.
 2. Further improving the MiniPile pipeline and creating a more effective version of MiniPile.
 3. Preparing the improved pipeline for general applicability with the theoretical example of [RefinedWeb (Penedo, et al. 2023)](https://arxiv.org/abs/2306.01116).
 
@@ -25,7 +25,7 @@ The findings and implications of this project can be found at the end of the [Co
 
 ## Quick Guide: Build your own MiniPile
 
-Every script in this respository has the instructions on how to run it at the end of the script.
+Every script in this respository has the instructions on how to run it noted at the end of it.
 
 1. Download [The Pile Deduplicated](https://huggingface.co/datasets/EleutherAI/the_pile_deduplicated) from HuggingFace, e.g. by using `01_get_piles.ipynb`.
 2. Embed the Pile Deduplicated using `03_embed_pile_dedup_turbo.py`.
@@ -73,7 +73,7 @@ All individual ideas are documented extensively in the fourth chapter's Jupyter 
 7. Down-Sized Size-Density-Proportionate Sampling (`04_distill_pile_embed_idea_7_density-tiny.py`, `04_distill_pile_embed_idea_7_density-nano.py` and `04_distill_pile_embed_idea_7_density-pico.py`)
 
 Zero-shot benchmark results can be found further below.<br>
-We deem the **Size-Density-Proportionate Sampling** (Idea 3) the most interesting and impactful idea, as it is more representative of the original Pile Deduplicated while being smaller in example count than MiniPile. Compared to the reproduction, improvements were observed on the WinoGrande, ARC-Challenge and BLiMP benchmarks. This approach was further investigated in (Ideas 7, 8, 9) to reduce the distilled, density-sampled dataset size to 90% (Idea 7) of the dataset created in (Idea 3), and then fruther to 75% (Idea 8) as well as 25% (Idea 9) of the original MiniPile size, respectively.
+We deem the **Size-Density-Proportionate Sampling** (Idea 3) the most impactful idea regarding the fullfilling of our project targets, as it is more representative of the original Pile Deduplicated while being smaller in example count than MiniPile. Compared to the reproduction, improvements were observed on the WinoGrande, ARC-Challenge and BLiMP benchmarks. This approach was further investigated in (Ideas 7, 8, 9) to reduce the distilled, density-sampled dataset size to 90% (Idea 7) of the dataset created in (Idea 3), and then fruther to 75% (Idea 8) as well as 25% (Idea 9) of the original MiniPile size, respectively.
 
 ### Size-Density-Proportionate Sampling
 
@@ -98,9 +98,10 @@ As it was a goal to produce a smaller, more retaining/representative version of 
 ## Benchmark Results
 
 Detailed results can be found in the [benchmarks](./benchmarks/) folder.<br>
-Benchmark comparisons were additionally documented in the [MiniPile_Pile_Benchmark_Comparisons.ods](./MiniPile_Pile_Benchmark_Comparisons.ods) spreadsheet, where more rigorous statistical analysis was also conducted.<br>
-LaTeX-versions of the below tables can be found in the [benchmark_results.pdf](./img/benchmark_results.pdf) (markdown tables below for readability).<br>
-All benchmarks indicate zero-shot performance.
+Benchmark comparisons were additionally documented in the [MiniPile_Pile_Benchmark_Comparisons.ods](./MiniPile_Pile_Benchmark_Comparisons.ods) spreadsheet and across the fourth chapter's Jupyter Notebook. We conducted a little more rigorous statistical analysis there, too.<br>
+All benchmarks indicate zero-shot performance.<br>
+(markdown tables below for readability)<br>
+LaTeX-versions of the benchmark tables can be found in the [benchmark_results.pdf](./img/benchmark_results.pdf).<br>
 
 ### Pythia 160M models
 
@@ -139,7 +140,7 @@ All benchmarks indicate zero-shot performance.
 
 ## Interpretation on practical improvements
 
-With this study project, we replicated the MiniPile pipeline, produced a reproduction dataset and attempted several ideas for improvement of the distillation pipeline, which we then compared primarily by training and benchmarking the 160M Pythia decoder-only model architecture.
+With this project, we replicated the MiniPile pipeline, produced a reproduction dataset and attempted several ideas for improvement of the distillation pipeline, which we then compared primarily by training and benchmarking the 160M Pythia decoder-only model architecture.
 
 ### Reproduction Challenges and Insights
 
@@ -193,7 +194,7 @@ At 160M parameters, the models can effectively learn from this concentrated form
 
 ### 1.4B Results and Revision of Hypotheses
 
-1.4B Pile Deduplicated shows major improvements over 160M Pile Deduplicated across all metrics. However, like the original MiniPile, none of the new sampling approaches successfully preserve the qualities that enable scaling retained knowledge with model size. Moreover, none of the MiniPile variants of 1.4B show notable improvements to their 160M counterparts, but instead indicate occasional slight degradation. While training on the Pile Deduplicated has scores effectively scale with model size (e.g., HellaSwag: 0.29→0.418), all MiniPile variants miss out on this effect and fail to leverage increased model capacity. HellaSwag stays at ~0.26, size-density-proportionate sampling had seen 0.520 on 160M WinoGrande, but this even got reduced to 0.504 on 1.4B. These results strongly suggest that optimal training of large models requires substantially more, diverse data than any of the sampling methods preserve, particularly for capturing the patterns that larger models can 'comprehend' and leverage.
+1.4B Pile Deduplicated shows major improvements over 160M Pile Deduplicated across all metrics. However, like the original MiniPile, none of the new sampling approaches successfully preserve the qualities that enable scaling retained knowledge with model size. Moreover, none of the MiniPile variants of 1.4B show notable improvements to their 160M counterparts, but instead indicate occasional slight degradation. While training on the Pile Deduplicated has scores effectively scale with model size (e.g., HellaSwag: 0.29 to 0.418), all MiniPile variants miss out on this effect and fail to leverage increased model capacity. HellaSwag stays at ~0.26, size-density-proportionate sampling had seen 0.520 on 160M WinoGrande, but this even got reduced to 0.504 on 1.4B. These results strongly suggest that optimal training of large models requires substantially more, diverse data than any of the sampling methods preserve, particularly for capturing the patterns that larger models can 'comprehend' and leverage.
 
 Ignoring the results for 1.4B Pile Deduplicated for a moment, we also see another effect: The performance differences between the different MiniPile versions diminish, with the size-density-proportionate sampling approach not being a clear improvement at all anymore, but instead being just marginally better only in HellaSwag and both Lambada perplexity scores.
 
@@ -247,7 +248,7 @@ The behaviors across 160M and 1.4B architectures suggest that looking at smaller
 ## Improving the MiniPile Pipeline, Theoretically
 
 All of the above improvements and modifications aim to be specifically applicable within resource-constrained (e.g. academic) environments.<br>
-At a minimum, only the disk space for The Pile Deduplicated, its embedded version (I create a copy of Pile Deduplicated because I want to ensure index consistency), the clustering results and the MiniPile you want to sample from it are required. You will need a recent consumer-grade GPU for the embedding and clustering steps, but the sampling can again be done on a CPU-only machine.
+At a minimum, only the disk space for The Pile Deduplicated, its embedded version (I create a copy of Pile Deduplicated because I want to ensure index consistency), the clustering results and the MiniPile you want to sample from it are required. You will need a rather recent consumer-grade (CUDA-supporting) GPU for the embedding and clustering steps, but the sampling can again be done on a CPU-only machine.
 
 Imposing this constraint for accessibility naturally limits the reachable improvement space for the MiniPile pipeline.<br>
 The `04_improve_minipile.ipynb` notebook contains a theoretical section that discusses more fundamental improvements that could be made if the resource constraint was lifted.<br>
@@ -274,7 +275,7 @@ These theoretical improvements for assembly are:
 The final step of the MiniCorpus project is to prepare the optimized pipeline for general applicability with the example of RefinedWeb.<br>
 The RefinedWeb dataset is a subset of the CommonCrawl dataset that was filtered and deduplicated.<br>
 However, RefinedWeb is not a clear sum of diverse, smaller datasets like The Pile Deduplicated.<br>
-Therefore, we have to find a way lift the need for $k$-Means clustering, which was based on knowledge of the Pile's assembly, and instead use a more general approach to sample a MiniRefinedWeb.
+Therefore, we have to find a way to lift the need for $k$-Means clustering, which was based on knowledge of the Pile's assembly, and instead use a more general approach to sample a MiniRefinedWeb.
 The mending and adapting of the pipeline for RefinedWeb is documented in the Jupyter Notebook `05_refinedweb_pipeline.ipynb`.
 
 ## Produced Artifacts
