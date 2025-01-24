@@ -25,7 +25,7 @@ class Config:
     tokenization_batch_size: int = 128 # That's the max on 4x A6000
     prefetch_batches: int = 2
     embedding_dim: int = 768  # Doesn't do anything, but signals use of e5-base-4k
-    shard_size: int = tokenization_batch_size * 4096  # Embeddings per shard (shards 0-51, inclusive)
+    shard_size: int = tokenization_batch_size * 4096  # Embeddings per shard (shards 0-51 exclusive, they were * 8192)
     num_worker_threads: int = 4
     max_length: int = 1024  # Contained at 1024 for better depth than e5-large but better speed than 4k
 
