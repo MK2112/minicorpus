@@ -15,7 +15,8 @@ MiniPile data filtering pipeline, and adapting this pipeline for RefinedWeb
 - Examining the impact of parameter scaling on model performance when pre-trained
 with reduced but representative datasets, analyzing potential trade-offs in computational efficiency versus benchmark performance.
 
-The findings and implications of this project can be found at the end of the [Conclusion](#conclusion) section.
+The findings and implications of this project can be found at the end of the [Conclusion](#conclusion) section.<br>
+The produced models and datasets can be found on [HuggingFace](https://huggingface.co/Marcus2112) and are listed further below with the [Datasets](#datasets) and [Models](#models) sections.
 
 ## Project Setup
 
