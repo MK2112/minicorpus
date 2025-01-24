@@ -41,7 +41,7 @@ class AsyncWriter:
         
         # Start counting from the specified start_shard if provided
         self.current_shard = (self.config.start_shard if self.config.start_shard is not None 
-                            else self._get_next_shard_index())
+                              else self._get_next_shard_index())
 
     def _get_next_shard_index(self):
         # Count existing shards, determine the follow-up shard index
@@ -57,7 +57,7 @@ class AsyncWriter:
                     
                 embeddings, texts = data
                 table = pa.Table.from_arrays([pa.array(embeddings), pa.array(texts)], 
-                                           names=['embedding', 'content'])
+                                             names=['embedding', 'content'])
                 
                 # Use file lock to prevent concurrent writes to the same directory
                 lock_path = self.output_dir / "write.lock"
@@ -96,13 +96,11 @@ class TokenizationWorker:
                 break
             
             prefixed_texts = ["query: " + text for text in batch['content']]
-            tokenized = self.tokenizer(
-                prefixed_texts, 
-                max_length=self.config.max_length, 
-                padding="max_length",
-                truncation=True,
-                return_tensors='pt'
-            )
+            tokenized = self.tokenizer(prefixed_texts, 
+                                       max_length=self.config.max_length, 
+                                       padding="max_length",
+                                       truncation=True,
+                                       return_tensors='pt')
             self.output_queue.put((tokenized, batch['content']))
             del prefixed_texts
 
@@ -134,44 +132,29 @@ class EmbeddingPipeline:
     def load_model(self):
         model_path = str(self.base_path / "e5-base-4k")
         self.tokenizer = AutoTokenizer.from_pretrained(model_path, use_fast=True, 
-                                                     local_files_only=True)
-        self.model = AutoModel.from_pretrained(
-            model_path, 
-            local_files_only=True, 
-            low_cpu_mem_usage=True,
-            attn_implementation="sdpa"
-        )
+                                                       local_files_only=True)
+        self.model = AutoModel.from_pretrained(model_path, 
+                                               local_files_only=True, 
+                                               low_cpu_mem_usage=True,
+                                               attn_implementation="sdpa")
         self.model = self.accelerator.prepare(self.model)
         self.model.eval()
 
     def load_dataset(self):
         # Calculate skip based on start_shard if specified
-        skip_items_count = (
-            self.config.start_shard * self.config.shard_size 
-            if self.config.start_shard is not None 
-            else 0
-        )
-        
-        dataset = load_dataset(
-            "parquet",
-            data_files={"train": str(self.base_path / "RefinedWeb" / "data" / "train-*.parquet")},
-            cache_dir=None,
-            split="train",
-            streaming=True
-        )
-        
+        skip_items_count = (self.config.start_shard * self.config.shard_size if self.config.start_shard is not None else 0)
+        dataset = load_dataset("parquet",
+                               data_files={"train": str(self.base_path / "RefinedWeb" / "data" / "train-*.parquet")},
+                               cache_dir=None,
+                               split="train",
+                               streaming=True)
         if skip_items_count > 0 and self.accelerator.is_main_process:
             print(f"Skipping {skip_items_count} items to start from shard {self.config.start_shard}")
         dataset = dataset.skip(skip_items_count)
-        
-        # If end_shard is specified, calculate how many items to take
+        # If end_shard specified, calculate how many items to take
         if self.config.end_shard is not None:
-            items_to_take = (
-                (self.config.end_shard - (self.config.start_shard or 0)) 
-                * self.config.shard_size
-            )
+            items_to_take = ((self.config.end_shard - (self.config.start_shard or 0)) * self.config.shard_size)
             dataset = dataset.take(items_to_take)
-            
         return dataset
     
     def average_pool(self, last_hidden_states: Tensor, attention_mask: Tensor) -> Tensor:
@@ -184,7 +167,7 @@ class EmbeddingPipeline:
         inputs = {k: v.to(self.accelerator.device) for k, v in tokenized_batch.items()}
         outputs = self.model(**inputs)
         embeddings = self.average_pool(outputs.last_hidden_state, 
-                                     tokenized_batch['attention_mask'])
+                                       tokenized_batch['attention_mask'])
         embeddings = F.normalize(embeddings, p=2, dim=1)
         embeddings_np = embeddings.cpu().numpy()
         del embeddings, inputs, outputs, tokenized_batch
@@ -202,12 +185,10 @@ class EmbeddingPipeline:
 
         tokenization_workers = []
         for _ in range(self.config.num_worker_threads):
-            worker = TokenizationWorker(
-                self.tokenizer, 
-                self.config,
-                tokenization_input_queue,
-                tokenization_output_queue
-            )
+            worker = TokenizationWorker(self.tokenizer, 
+                                        self.config,
+                                        tokenization_input_queue,
+                                        tokenization_output_queue)
             thread = threading.Thread(target=worker.run, daemon=True)
             thread.start()
             tokenization_workers.append(thread)
@@ -273,9 +254,7 @@ if __name__ == "__main__":
     
     args = parser.parse_args()
     
-    config = Config(
-        start_shard=args.start_shard,
-        end_shard=args.end_shard
-    )
+    config = Config(start_shard=args.start_shard,
+                    end_shard=args.end_shard)
     pipeline = EmbeddingPipeline(config)
     pipeline.run()
