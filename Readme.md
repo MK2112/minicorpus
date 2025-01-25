@@ -365,4 +365,4 @@ The mending and adapting of the pipeline for RefinedWeb is documented in the Jup
 
 ## License
 
-This repository's contents are licensed under [GNU AGPLv3](LICENSE.md) to freely encourage academic discourse.
+This repository's contents are licensed under [GNU AGPLv3](LICENSE.md) to encourage academic discourse.
