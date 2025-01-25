@@ -362,3 +362,9 @@ The mending and adapting of the pipeline for RefinedWeb is documented in the Jup
 - [Improve BIRCH algorithm for big data clustering (Ramadhani, et al. 2020)](https://iopscience.iop.org/article/10.1088/1757-899X/725/1/012090)
 - [Using Projection-Based Clustering to Find Distance- and Density-Based Clusters in High-Dimensional Data (Thrun, M. C. & Ultsch, Alfred. 2020)](https://link.springer.com/article/10.1007/s00357-020-09373-2)
 - [Surpassing Cosine Similarity for Multidimensional Comparisons: Dimension Insensitive Euclidean Metric (DIEM) (Tessari, et al. 2024)](https://arxiv.org/abs/2407.08623)
+
+## License
+
+This repository's contents are dual-licensed in order to contribute to academic discourse while ensuring sustainability:
+- **For non-commercial/academic use**: The code is available under [GNU AGPLv3](LICENSE.md).
+- **For commercial use**: A [commercial license](COMMERCIAL_LICENSE.md) is required for this code.
