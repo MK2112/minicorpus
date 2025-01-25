@@ -357,6 +357,7 @@ The mending and adapting of the pipeline for RefinedWeb is documented in the Jup
 
 ## Related Work - MiniRefinedWeb
 
+- [The RefinedWeb Dataset for Falcon LLM: Outperforming Curated Corpora with Web Data, and Web Data Only (Penedo, et al. 2023)](https://arxiv.org/abs/2306.01116)
 - [Efficient Clustering of High-Dimensional Data Sets with Application to Reference Matching (McCallum, et al. 2000)](https://pubs.dbs.uni-leipzig.de/dc/files/McCallum2000Efficientclusteringofhighdimensionaldatasetswith.pdf)
 - [Improve BIRCH algorithm for big data clustering (Ramadhani, et al. 2020)](https://iopscience.iop.org/article/10.1088/1757-899X/725/1/012090)
 - [Using Projection-Based Clustering to Find Distance- and Density-Based Clusters in High-Dimensional Data (Thrun, M. C. & Ultsch, Alfred. 2020)](https://link.springer.com/article/10.1007/s00357-020-09373-2)
