@@ -368,3 +368,5 @@ The mending and adapting of the pipeline for RefinedWeb is documented in the Jup
 This repository's contents are dual-licensed in order to contribute to academic discourse while ensuring sustainability:
 - **For non-commercial/academic use**: The code is available under [GNU AGPLv3](LICENSE.md).
 - **For commercial use**: A [commercial license](COMMERCIAL_LICENSE.md) is required for this code.
+
+We explicitly prohibit commercial applications in surveillance, or military systems.
