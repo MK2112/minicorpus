@@ -1,7 +1,6 @@
 import os
 import gc
 import torch
-import argparse
 import numpy as np
 from tqdm import tqdm
 from pathlib import Path
@@ -27,9 +26,10 @@ class Config:
     prefetch_batches: int = 2
     shard_size: int = tokenization_batch_size * 8192  # ~1M embeddings per shard
     num_worker_threads: int = 4
-    max_length: int = 1024  # each embedding is 768-dimensional
-    start_shard: Optional[int] = None  # Starting shard index (inclusive)
-    end_shard: Optional[int] = None    # Ending shard index (exclusive)
+    max_length: int = 1024   # Each embedding is 768-dimensional
+    # Set these for sectioning what you want to process
+    start_shard: int = None  # Starting shard index (inclusive), trying out this Optional thingy for once
+    end_shard: int = None    # Ending shard index (exclusive)
 
 class AsyncWriter:
     def __init__(self, output_dir: Path, config: Config):
@@ -40,8 +40,7 @@ class AsyncWriter:
         self.writer_thread.start()
         
         # Start counting from the specified start_shard if provided
-        self.current_shard = (self.config.start_shard if self.config.start_shard is not None 
-                              else self._get_next_shard_index())
+        self.current_shard = (self.config.start_shard if self.config.start_shard is not None else self._get_next_shard_index())
 
     def _get_next_shard_index(self):
         # Count existing shards, determine the follow-up shard index
@@ -56,10 +55,10 @@ class AsyncWriter:
                     break
                     
                 embeddings, texts = data
-                table = pa.Table.from_arrays([pa.array(embeddings), pa.array(texts)], 
-                                             names=['embedding', 'content'])
+                table = pa.Table.from_arrays([pa.array(embeddings), pa.array(texts)], names=['embedding', 'content'])
                 
                 # Use file lock to prevent concurrent writes to the same directory
+                # We're prob going overkill with this, but this is the textbook way to do it and, eh, trying it out i guess
                 lock_path = self.output_dir / "write.lock"
                 with filelock.FileLock(str(lock_path)):
                     shard_path = self.output_dir / f"shard_{self.current_shard:09d}.parquet"
@@ -72,8 +71,7 @@ class AsyncWriter:
                 
     def write(self, embeddings: List[np.ndarray], texts: List[str]):
         # Only write if we're within our assigned shard range
-        if (self.config.end_shard is None or 
-            self.current_shard < self.config.end_shard):
+        if (self.config.end_shard is None or self.current_shard < self.config.end_shard):
             self.write_queue.put((embeddings, texts))
         
     def finish(self):
@@ -81,8 +79,7 @@ class AsyncWriter:
         self.writer_thread.join()
 
 class TokenizationWorker:
-    def __init__(self, tokenizer, config: Config, input_queue: queue.Queue, 
-                 output_queue: queue.Queue):
+    def __init__(self, tokenizer, config: Config, input_queue: queue.Queue, output_queue: queue.Queue):
         self.tokenizer = tokenizer
         self.config = config
         self.input_queue = input_queue
@@ -95,6 +92,8 @@ class TokenizationWorker:
                 self.output_queue.put(None)
                 break
             
+            # Come to think of it, maybe this prefix adding akin to what the original model description
+            # may be another explanation for why we perform well even with the small E5-Base-4k
             prefixed_texts = ["query: " + text for text in batch['content']]
             tokenized = self.tokenizer(prefixed_texts, 
                                        max_length=self.config.max_length, 
@@ -122,21 +121,15 @@ class EmbeddingPipeline:
         for dir_path in [target_dir, cache_dir]:
             os.makedirs(dir_path, exist_ok=True)
             
-        snapshot_download(
-            "dwzhu/e5-base-4k",
-            repo_type="model",
-            cache_dir=str(cache_dir),
-            local_dir=str(target_dir)
-        )
+        snapshot_download("dwzhu/e5-base-4k",
+                          repo_type="model",
+                          cache_dir=str(cache_dir),
+                          local_dir=str(target_dir))
 
     def load_model(self):
         model_path = str(self.base_path / "e5-base-4k")
-        self.tokenizer = AutoTokenizer.from_pretrained(model_path, use_fast=True, 
-                                                       local_files_only=True)
-        self.model = AutoModel.from_pretrained(model_path, 
-                                               local_files_only=True, 
-                                               low_cpu_mem_usage=True,
-                                               attn_implementation="sdpa")
+        self.tokenizer = AutoTokenizer.from_pretrained(model_path, use_fast=True, local_files_only=True)
+        self.model = AutoModel.from_pretrained(model_path, local_files_only=True, low_cpu_mem_usage=True, attn_implementation="sdpa")
         self.model = self.accelerator.prepare(self.model)
         self.model.eval()
 
@@ -166,8 +159,7 @@ class EmbeddingPipeline:
     def process_batch(self, tokenized_batch):
         inputs = {k: v.to(self.accelerator.device) for k, v in tokenized_batch.items()}
         outputs = self.model(**inputs)
-        embeddings = self.average_pool(outputs.last_hidden_state, 
-                                       tokenized_batch['attention_mask'])
+        embeddings = self.average_pool(outputs.last_hidden_state, tokenized_batch['attention_mask'])
         embeddings = F.normalize(embeddings, p=2, dim=1)
         embeddings_np = embeddings.cpu().numpy()
         del embeddings, inputs, outputs, tokenized_batch
@@ -240,21 +232,13 @@ class EmbeddingPipeline:
             worker.join()
 
         if self.accelerator.is_main_process:
-            # Create a range-specific completion file
+            # Create a range-aware completion notice (file)
+            # Maybe I need that, maybe not, better safe than sorry
             range_str = f"{self.config.start_shard}-{self.config.end_shard}"
             end_file = self.embd_dir / f"completed_range_{range_str}.txt"
             end_file.touch()
 
         pbar.close()
 
-if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description='Parallel embedding pipeline')
-    parser.add_argument('--start-shard', type=int, help='Starting shard index (inclusive)')
-    parser.add_argument('--end-shard', type=int, help='Ending shard index (exclusive)')
-    
-    args = parser.parse_args()
-    
-    config = Config(start_shard=args.start_shard,
-                    end_shard=args.end_shard)
-    pipeline = EmbeddingPipeline(config)
-    pipeline.run()
+if __name__ == "__main__":    
+    EmbeddingPipeline(Config()).run()
