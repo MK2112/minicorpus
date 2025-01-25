@@ -297,7 +297,7 @@ The mending and adapting of the pipeline for RefinedWeb is documented in the Jup
 - [minipile_density-proportioned](https://huggingface.co/datasets/Marcus2112/minipile_density-proportioned)
     - contains the text and pile idx per document of a MiniPile that was cluster-wise sampled from proportionally to an equally weighted factor of cluster density and cluster size.
 - [minipile_low-density-proportioned](https://huggingface.co/datasets/Marcus2112/minipile_low-density-proportioned)
-    - contains the text and pile idx per document of a MiniPile that was cluster-wise sampled from proportionally to a weighted factor of cluster density and cluster size, but biased towards sampling from lower density clusters.
+    - contains the text and pile idx per document of a MiniPile that was cluster-wise sampled from proportionally to a weighted factor of cluster density and cluster size, but biased towards sampling from lower density clusters. We set $\omega = 0.75$.
 - [pile_dedup_embeddings_clusters_k440](https://huggingface.co/datasets/Marcus2112/pile_dedup_embeddings_clusters_k440)
     - contains the idx from The Pile Deduplicated, the associated cluster, and the embedding's distance to the cluster centroid, for each embedding, from a clustering with $k=440$.
 - [minipile_k440](https://huggingface.co/datasets/Marcus2112/minipile_k440)
