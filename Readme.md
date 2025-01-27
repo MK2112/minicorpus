@@ -277,7 +277,8 @@ The final step of the MiniCorpus project is to prepare the optimized pipeline fo
 The RefinedWeb dataset is a subset of the CommonCrawl dataset that was filtered and deduplicated.<br>
 However, RefinedWeb is not a clear sum of diverse, smaller datasets like The Pile Deduplicated.<br>
 Therefore, we have to find a way to lift the need for $k$-Means clustering, which was based on knowledge of the Pile's assembly, and instead use a more general approach to sample a MiniRefinedWeb.
-The mending and adapting of the pipeline for RefinedWeb is documented in the Jupyter Notebook `05_refinedweb_pipeline.ipynb`.
+The mending and adapting of the pipeline for RefinedWeb is documented in the Jupyter Notebook `05_refinedweb_pipeline.ipynb`.<br>
+As an initial, practical contribution, we assembled an [embedded excerpt of RefinedWeb](https://huggingface.co/datasets/Marcus2112/refinedweb-embedded_prototype) intended for use during prototyping on the above described generalized methodology.
 
 ## Produced Artifacts
 
@@ -314,6 +315,8 @@ The mending and adapting of the pipeline for RefinedWeb is documented in the Jup
     - retaining 75% of the original MiniPile example count, sampled with size-density-proportionate sampling at $\omega = 0.5$.
 - [minipile_density-proportioned_pico](https://huggingface.co/datasets/Marcus2112/minipile_density-proportioned_pico)
     - retaining 25% of the original MiniPile example count, sampled with size-density-proportionate sampling at $\omega = 0.5$.
+- [refinedweb-embedded_prototype](https://huggingface.co/datasets/Marcus2112/refinedweb-embedded_prototype)
+    - a largest possible (on HuggingFace free tier without requesting additional resources) excerpt of RefinedWeb, embedded with E5-Base-4k
 
 ### Models
 
