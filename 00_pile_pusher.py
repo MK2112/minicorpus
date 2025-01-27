@@ -15,18 +15,18 @@ def push_dataset(repo_id):
                            'test': load_dataset('parquet', data_files=str(base_path / 'MiniPile_DensityProportionedHigh/minipile_DensityProportionedHigh_test_shard_*.parquet'), split='train')})
     dataset.push_to_hub(repo_id)
 
-def push_xl_dataset(repo_id, max_files=None):
+def push_xl_dataset(repo_id, max_shards=None):
     # Dataset is bigger than 300GB, ask datasets@huggingface.co to grant more storage
     # See https://huggingface.co/docs/hub/storage-limits on what to inform about exactly
     api = HfApi()
     create_repo(repo_id=repo_id, repo_type="dataset", exist_ok=True)
-    all_files = sorted(glob.glob(str(base_path / 'RefinedWeb_Embd/shard_*.parquet')))
-    files_to_upload = all_files[:max_files] if max_files is not None else all_files
-    for file_path in tqdm(files_to_upload):
-        file_name = os.path.basename(file_path)
-        print(f"Uploading {file_name}...")
-        api.upload_file(path_or_fileobj=file_path,
-                        path_in_repo=f"{file_name}",
+    all_shards = sorted(glob.glob(str(base_path / 'RefinedWeb_Embd/shard_*.parquet')))
+    shards_to_upload = all_shards[:max_shards] if max_shards is not None else all_shards
+    for shard_path in tqdm(shards_to_upload):
+        shard_name = os.path.basename(shard_path)
+        print(f"Uploading {shard_name}...")
+        api.upload_file(path_or_fileobj=shard_path,
+                        path_in_repo=f"{shard_name}",
                         repo_id=repo_id,
                         repo_type="dataset")
 
@@ -45,4 +45,4 @@ if __name__ == "__main__":
     #push_dataset("Marcus2112/minipile_low-density")
     #push_jsonl_dataset(repo_id="Marcus2112/pile_dedup_embeddings_clusters_k440")
     #push_model(repo_id="Marcus2112/pythia-160m-minipile_low-density")
-    push_xl_dataset(repo_id="Marcus2112/refinedweb-embedded_prototype", max_files=50)
+    push_xl_dataset(repo_id="Marcus2112/refinedweb-embedded_prototype", max_shards=50)
