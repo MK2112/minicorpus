@@ -11,6 +11,11 @@ from typing import Set, Dict, List
 from multiprocessing import Pool, cpu_count
 from fastparquet import ParquetFile
 
+# This was intended as an ablation study, investigating whether reducing the density factor's weight would lead to differences in the resulting MiniPile.
+# I wanted to set \omega to 0.25. Promptly, after setting all this here up, I realized that this ablation study's purpose was already covered by a prior study.
+# If we sample from clusters proportionally by their size and purposely de-sensitize the density's impact, then ey, we did that already to an
+# extreme with the cluster-proportioned sampling, which didn't care about density at all.
+
 @dataclass
 class DistillConfig:
     base_dir: Path = Path("/vol/tmp/koppelmm")
@@ -20,7 +25,7 @@ class DistillConfig:
     num_clusters: int = 220 # As per paper
     num_clusters_to_exclude: int = 38 # As per paper
     density_weight: float = 0.25 # Favors larger clusters stronger than sparse clusters
-    edition: str = "DensityProportionedLow" # Version of MiniPile, distinguishes file naming + output directory
+    edition: str = "DensityProportionedHigh" # Version of MiniPile, distinguishes file naming + output directory
     excluded_clusters: Set[int] = field(default_factory=lambda: {10, 15, 16, 22, 26, 28, 35, 37, 39, 40, 44, 46, 
                                                                  51, 57, 61, 64, 78, 86, 87, 88, 90, 94, 99, 101,
                                                                  102, 103, 111, 114, 152, 155, 163, 166, 167, 181,

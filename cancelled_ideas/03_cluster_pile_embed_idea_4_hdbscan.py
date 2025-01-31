@@ -9,6 +9,11 @@ from datasets import load_dataset
 from pathlib import Path
 from sklearn.neighbors import NearestNeighbors
 
+# Literally no idea what I was thinking. I was forcing HDBSCAN as a hypothetical in here.
+# HDBSCAN was added to sklearn in 1.3 https://scikit-learn.org/stable/modules/generated/sklearn.cluster.HDBSCAN.html
+# But this is a mess. The impossible-to-batch nature of HDBSCAN is known is makes all of this pointless if there's no way to batch it.
+# Didn't find a good batching approach.
+
 base_path = Path("/vol/tmp/koppelmm")
 embd_dir = base_path / "Pile_Deduplicated_Embd"
 cluster_dir = base_path / "MiniPile_HDBSCAN"

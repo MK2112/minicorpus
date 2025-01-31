@@ -1,3 +1,20 @@
+import gc
+import json
+import torch
+import numpy as np
+import jsonlines
+import pyarrow as pa
+import torch.nn as nn
+import pyarrow.parquet as pq
+from tqdm import tqdm
+from pathlib import Path
+from typing import List, Tuple
+from typing import Set, Dict, List
+from fastparquet import ParquetFile
+from dataclasses import dataclass, field
+from multiprocessing import Pool, cpu_count
+from transformers import AutoModelForCausalLM, AutoTokenizer
+
 ## Idea 2:
 #   Lossi (Loss-informed Sampling) is a one-shot proxy-based geometric sampling approach that is guided by a loss-based importance heuristic, 
 #   deviating from the original distillation process in the following ways:
@@ -21,23 +38,6 @@
 #   - Per cluster: Calculate the loss for each sampled document with a small Pythia $70\text{M}$ proxy model which itself was pretrained halfway through (`step72000`) The Pile Deduped.
 #   - Per cluster: Sort the documents by their loss and select the top [proporional amount as given by the jsonl] many of the documents with the highest loss for the final dataset
 #   - Continue with the dataset assembly as usual after that.
-
-import gc
-import json
-import torch
-import numpy as np
-import jsonlines
-import pyarrow as pa
-import torch.nn as nn
-import pyarrow.parquet as pq
-from tqdm import tqdm
-from pathlib import Path
-from typing import List, Tuple
-from typing import Set, Dict, List
-from fastparquet import ParquetFile
-from dataclasses import dataclass, field
-from multiprocessing import Pool, cpu_count
-from transformers import AutoModelForCausalLM, AutoTokenizer
 
 @dataclass
 class DistillConfig:
