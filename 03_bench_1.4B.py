@@ -20,8 +20,8 @@ pythia_pile = pythia_pile.to(device)
 batch_size_hflm = 1
 
 pythia_minipile_hflm = HFLM(pretrained=pythia_pile,
-                        tokenizer=tokenizer,
-                        batch_size=batch_size_hflm)
+                            tokenizer=tokenizer,
+                            batch_size=batch_size_hflm)
 
 results = simple_evaluate(model=pythia_minipile_hflm,
                           tasks=["arc_challenge", "mmlu", "winogrande", "hellaswag", "lambada", "blimp", "arc_easy"],
