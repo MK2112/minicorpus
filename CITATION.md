@@ -1,9 +1,7 @@
 # Academic Attribution
 
 This repository implements a methodology described in the paper:<br>
-**["The MiniPile Challenge for Data-Efficient Language Models"](https://arxiv.org/abs/2304.08442v1)** by Jean Kaddour.
-
-## Note  
+**["The MiniPile Challenge for Data-Efficient Language Models"](https://arxiv.org/abs/2304.08442v1)** by Jean Kaddour.<br>
 This implementation is not peer-reviewed or endorsed by the author of the original MiniPile paper.
 
 ## How to Cite This Work  
