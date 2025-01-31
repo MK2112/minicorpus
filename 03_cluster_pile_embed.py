@@ -267,11 +267,9 @@ def finalize_clustering():
 
                 # Write clustering results for each example
                 for idx, (text, label, distance) in enumerate(zip(texts, labels, distances)):
-                    result = {
-                        'idx': total_processed + idx,
-                        'cluster': int(label),
-                        'distance': float(distance)
-                    }
+                    result = {'idx': total_processed + idx,
+                              'cluster': int(label),
+                              'distance': float(distance)}
                     
                     if writer.write_result(result):
                         del result
