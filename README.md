@@ -284,8 +284,8 @@ As an initial, practical contribution, we assembled an [embedded excerpt of Refi
 
 ## Produced Artifacts
 
-- Go with [minipile_density-proportioned](https://huggingface.co/datasets/Marcus2112/minipile_density-proportioned) if you want to attain improved benchmark results with lower than 1M examples.
-- Go with [minipile_density-proportioned_pico](https://huggingface.co/datasets/Marcus2112/minipile_density-proportioned_pico) if you want to attain largely similar benchmark results to the original MiniPile with 250k examples.
+- Go with [minipile_density-proportioned](https://huggingface.co/datasets/Marcus2112/minipile_density-proportioned) if you want to attain improved task performance results with lower than 1M examples.
+- Go with [minipile_density-proportioned_pico](https://huggingface.co/datasets/Marcus2112/minipile_density-proportioned_pico) if you want to attain improved task performance results compared to the original MiniPile with 250k examples.
 
 ### Datasets
 
