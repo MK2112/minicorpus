@@ -220,7 +220,7 @@ This was further investigated with with a training run of 1.4B Pythia on "MiniPi
 
 The Density-based sampling approach's distillation size reduction not only shows competitive performance, but it beats the original size-density proportionate dataset in nearly all reasoning benchmarks, with a disproportionally small increase on the perplexity scores.<br>
 Furthermore, among all distillates trained on 1.4B (including the original MiniPile), Density Pico delivers best ARC-Challenge scores,<br>
-best HellaSwag scores and best ARC-Easy scores, at a quarter of MiniPile's size.
+best HellaSwag scores and best ARC-Easy scores, at a quarter of MiniPile's size.<br>
 <br>
 At 1.4B parameters, we can observe the size restriction act as a means of regularization: Essential knowledge transfer mechanisms remain intact, but at the cost of a reduced memorization capacity. There appears to be some optimal data-to-parameter ratio that balances feature extraction efficiency by the distillation, and memorization capacity and reasoning capability attainable by the model. This would allow for a possibility of tuning dataset size based on target application which could be especially interesting e.g. for curriculum learning approaches.
 
