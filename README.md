@@ -4,7 +4,7 @@ MiniCorpus reproduces and investigates enhancements for [MiniPile (Kaddour, Jean
 
 **MiniCorpus covers the following steps:**
 1. Reproducing MiniPile from the deduplicated Pile from scratch using the HuggingFace libraries and PyTorch.
-2. Further improving the MiniPile pipeline and creating a more effective version of MiniPile.
+2. Investigating potential improvements for the MiniPile pipeline and creating a more effective version of MiniPile.
 3. Preparing the improved pipeline for general applicability with the theoretical example of [RefinedWeb (Penedo, et al. 2023)](https://arxiv.org/abs/2306.01116).
 
 **Key objectives of this project:**
@@ -15,8 +15,8 @@ MiniPile data filtering pipeline, and adapting this pipeline for RefinedWeb
 - Examining the impact of parameter scaling on model performance when pre-trained
 with reduced but representative datasets, analyzing potential trade-offs in computational efficiency versus benchmark performance.
 
-The findings and implications of this project can be found at the end of the [Conclusion](#conclusion) section.<br>
-The produced models and datasets can be found on [HuggingFace](https://huggingface.co/Marcus2112) and are also listed further below with the [Datasets](#datasets) and [Models](#models) sections.
+The findings and implications of this project are presented at the end of the [Conclusion](#conclusion) section.<br>
+The produced models and datasets can be found on [HuggingFace](https://huggingface.co/Marcus2112) and are additionally listed further below in the [Datasets](#datasets) and [Models](#models) sections.
 
 ## Project Setup
 
@@ -26,7 +26,7 @@ The produced models and datasets can be found on [HuggingFace](https://huggingfa
 
 ## Quick Guide: Build your own MiniPile
 
-Every script in this respository has the instructions on how to run it noted at the end of it.
+Instructions for running each script in this repository are provided at the end of each respective script.
 
 1. Download [The Pile Deduplicated](https://huggingface.co/datasets/EleutherAI/the_pile_deduplicated) from HuggingFace, e.g. by using `01_get_piles.ipynb`.
 2. Embed the Pile Deduplicated using `03_embed_pile_dedup_turbo.py`.
@@ -40,7 +40,8 @@ Every script in this respository has the instructions on how to run it noted at 
 
 ## Reproducing MiniPile
 
-Reproduction of MiniPile's assembly is necessary to form a basis for attempts at improving it. The reproduction process is split across three chapters.
+Reproduction of MiniPile's assembly is necessary to form a basis for attempts at improving it.<br>
+The reproduction process is split across three chapters.<br>
 Files belonging to these chapters are prefixed with `01_`, `02_`, and `03_` respectively.<br>
 Jupyter Notebooks are added for each chapter for documentation and guidance.
 
@@ -53,10 +54,10 @@ Jupyter Notebooks are added for each chapter for documentation and guidance.
 We deem our reproduction of MiniPile successful.<br>
 However, we had to make compromises and assumptions:
 1. For embedding, [E5-Large](https://huggingface.co/intfloat/e5-large) was replaced with [E5-Base-4k](https://huggingface.co/dwzhu/e5-base-4k), which is smaller and faster, but [reported to perform worse](https://mono.software/2024/11/07/testing-embedding-models-rag/) than E5-Large representation-wise. We addressed this by raising the context window size from E5-Large's default 512 tokens to 1024 tokens. Furthermore, we deviate from the default model by employing scaled dot-product attention for E5-Base-4k, because it was found to further accelate inference.
-2. Cluster exclusion was done manually, as per paper. While we found and excluded the exact same amount of clusters with the same clusters described as examples by the paper, differences in cluster selection may have occured.
+2. Cluster exclusion was done manually, as per paper. While we found and excluded the exact same amount of clusters by the same categories described by the paper, differences in individual cluster selection may have occured.
 
 The reproduction dataset showed deviations from the benchmark results produced for MiniPile. These were observed both in the positive and negative direction on the Pythia 160M architecture. Most strongly deviating results were witnessed on ARC-Challenge (-10.9%) and MMLU (-15%) respectively, while HellaSwag (+1.72%), WinoGrande (+8.52%) and BLiMP (+5.53%) improved.<br>
-Notably, Lambada perplexity scores were reduced by 38.9% on Lambada OpenAI and 55% on Lambada Std. This indicates a potential tilt in the produced dataset in a slightly different direction content-wise, compared to the original MiniPile, due to embeddings or cluster selection. The small performance improvements witnessed on a majority of the benchmarks lead us to conclude that the reproduction shows characteristics in accordance with the paper's results and is within the margin of error. The deviations are sufficiently explainable by the need for speed (E5-Base-4k) and the human-guided cluseter exlcusion that can't be reproduced in detail. Even with our assumptions and changes to the methodology in place, we do not witness a fundamental departure from the paper's results overall. We therefore deem the reproduction successful.
+Notably, Lambada perplexity scores were reduced by 38.9% on Lambada OpenAI and 55% on Lambada Std. This indicates a potential tilt in the produced dataset in a slightly different direction content-wise, compared to the original MiniPile, due to derivation of embeddings or cluster selection. The small performance improvements witnessed on a majority of the benchmarks lead us to conclude that the reproduction shows characteristics in accordance with the paper's results and is within the margin of error. The deviations are sufficiently explainable by the need for speed (E5-Base-4k) and the human-guided cluseter exlcusion that can't be reproduced in detail. Even with our assumptions and changes to the methodology in place, we do not witness a fundamental departure from the paper's results overall. We therefore deem the reproduction successful.
 
 ## Improving the MiniPile Pipeline, Practically
 
@@ -101,7 +102,7 @@ As it was a goal to produce a smaller, more retaining/representative version of 
 
 Detailed results can be found in the [benchmarks](./benchmarks/) folder.<br>
 Benchmark comparisons were additionally documented in the [MiniPile_Pile_Benchmark_Comparisons.ods](./MiniPile_Pile_Benchmark_Comparisons.ods) spreadsheet and across the fourth chapter's Jupyter Notebook. We conducted a little more rigorous statistical analysis there, too.<br>
-All benchmarks indicate zero-shot performance.<br>
+All benchmarks indicate *zero-shot* performance.<br>
 (markdown tables below for readability)<br>
 LaTeX-versions of the benchmark tables can be found in the [benchmark_results.pdf](./img/benchmark_results.pdf).<br>
 
@@ -155,7 +156,7 @@ Additionally, the project produced six Pythia 160M models exploring distinct ide
 
 For the Pythia 160M model benchmarks, we see that all of the 'improved' MiniPile model variants maintain similar MMLU performance (0.230, which is slightly worse than random guessing at 0.250), undercutting the original MiniPile (0.270) slightly. WinoGrande shows high consistency across MiniPile model variants, too. Compared to the Pile-trained model, every MiniPile model variant indicates catastrophic failure on both versions of Lambada, with perplexity scores in the millions. However, Blimp scores show only moderate degradation from the Pile-trained baseline, indicating a high retention of reasoning capabilities.
 
-The 160M MiniPile baseline shows highest MMLU (0.270) and competitive ARC-Challenge scores (0.213), while 160M Density shows best WinoGrande (0.520) and solid Blimp (0.550) scores, and at the same time being approx. 6% smaller in training example count compared to MiniPile, and 13% smaller in memory footprint than the MiniPile reproduction.
+The Pythia 160M MiniPile baseline shows highest MMLU (0.270) and competitive ARC-Challenge scores (0.213), while 160M Density shows best WinoGrande (0.520) and solid Blimp (0.550) scores, and at the same time being approx. 6% smaller in training example count compared to MiniPile, and 13% smaller in memory footprint than the MiniPile reproduction.
 
 Of the attempted improvements, the "Low Density" version shows overall lowest scores, beating the reproduction only slightly in the Blimp benchmark.
 This implies that it is important to enforce capturing diversity, but to also still sufficiently capture dense, similar regions of data instead of overly prefering sparse, unique example regions.
@@ -165,7 +166,7 @@ When solely regarding the Pythia 160M results, one could interpret that:
 - Quality and representation capability of examples matters more than quantity
 - Dense regions of data contain learning signal, while sparse regions contain diversity, which we also have to make sure to consider and include
 
-Notably, Density Tiny, Nano and Pico versions show performance degradation, but this effect turns out surprisingly minimal.
+Notably, on Pythia 160M, Density Tiny, Nano and Pico versions show performance degradation, but this effect turns out surprisingly minimal.
 
 Again, considering only the Pythia 160M results, one could think that this would be due to:
 - The deduplicated Pile potentially still containing duplicates, granting the maintaining of signal strength on smaller subsets
@@ -192,7 +193,7 @@ From that, we derive:
 2. The smaller MiniPile Density Pico dataset appears to provide an actually more concentrated learning signal, reaching optimal performance earlier and maintaining stability with extended training and even improving on perplexity scores compared to the standard training setup for the bigger MiniPile Density.
 3. Dataset size reduction, at least for The Pile Deduplicated as base, may actually serve as a regularizer, helping prevent overfitting on reasoning tasks while maintaining core language modeling capabilities.
 
-At 160M parameters, the models can effectively learn from this concentrated form of the data without overfitting, possibly because, as we observed, the reduced dataset matches better with what a 160M model can absorb and utilize. When we scale up to 1.4B parameters, this same "compression" becomes a critical limitation - the larger models have the capacity to learn more complex patterns and relationships that were filtered out by the sampling processes.
+At 160M parameters, the Pythia models can effectively learn from this concentrated form of the data without overfitting, possibly because, as we observed, the reduced dataset matches better with what a 160M model can absorb and utilize. When we scale up to 1.4B parameters, this same "compression" becomes a critical limitation - the larger models have the capacity to learn more complex patterns and relationships that were filtered out by the sampling processes.
 
 ### 1.4B Results and Revision of Hypotheses
 
@@ -230,13 +231,13 @@ With the 1.4B results, we have to revise the 160M result interpretations and hav
 - The small performance gaps to The Pile Deduplicated at 160M scale could be misleading about distillate quality
 - The Tiny/Nano/Pico versions may just have made the individual examples more digestible to the smaller 160M model, but have then been shown on 1.4B with Pico to actually retain better quality examples, indiciating that an essential knowledge transfer can happen with much smaller dataset subsets after all.
 
-At larger scale, none of the sampling methods come close to full dataset performance. The 1.4B results suggest that proxy-based geometric sampling as performed by MiniPile may be insufficient for building truly scalable, hollistically preserving, distilled data subsets.
+At larger scale, none of the sampling methods come close to full dataset performance. The Pythia 1.4B results suggest that proxy-based geometric sampling as performed by MiniPile may be insufficient for building truly scalable, hollistically preserving, distilled data subsets.
 
 ### Conclusion
 
 With a successful replication and several different improvement approaches explored, a notable improvement was found with the [minipile_density-proportioned](https://huggingface.co/datasets/Marcus2112/minipile_density-proportioned) (Idea 3). This dataset is smaller than MiniPile, but shows competitive performance on all benchmarks.
 
-The behaviors across 160M and 1.4B architectures suggest that looking at smaller models alone is misleading when evaluating dataset distillation techniques. The relationship between factors like dataset size, training duration, and model capacity is more complex than initially thought. In this regime, the Density sampling approach appears highly effective when combined with aggressive dataset size reduction, both on 160M and 1.4B. 
+The behaviors across decoder-only Pythia 160M and 1.4B architectures suggest that looking at smaller models alone is misleading when evaluating dataset distillation techniques. The relationship between factors like dataset size, training duration, and model capacity is more complex than initially thought. In this regime, the Density sampling approach appears highly effective when combined with aggressive dataset size reduction, both on Pythia 160M and 1.4B. 
 
 **Summarizing the key findings:**
 1. Dataset distillation effectiveness cannot be properly evaluated using only individual architectures (like small 160M parameters). These models may be hitting architectural capacity limits that mask true implications of data reduction by overfitting.
