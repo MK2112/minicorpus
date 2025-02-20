@@ -106,6 +106,8 @@ All benchmarks indicate *zero-shot* performance.<br>
 (markdown tables below for readability)<br>
 LaTeX-versions of the benchmark tables can be found in the [benchmark_results.pdf](./img/benchmark_results.pdf).<br>
 
+<img src="./img/pythia_radar_charts.png" style="width: auto; height: 600px" />
+
 ### Pythia 160M models
 
 | Model                   | ARC-Challenge (acc) | ARC-Challenge (stddev) | MMLU (acc) | MMLU (stddev) | HellaSwag (acc) | HellaSwag (stddev) | WinoGrande (acc) | WinoGrande (stddev) | Lambada (OpenAI) (acc) | Lambada (OpenAI) (stddev) | Lambada (OpenAI) (perplexity) | Lambada (OpenAI) (stddev) | Blimp (acc) | Blimp (stddev) | Lambada (Std) (acc) | Lambada (Std) (stddev) | Lambada (Std) (perplexity) | Lambada (Std) (stddev) |
